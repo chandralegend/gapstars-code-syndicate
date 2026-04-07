@@ -4,6 +4,12 @@ import { API_URL, type StreamChunk } from "@/lib/types"
 
 /**
  * Sends a message to the FastAPI SSE streaming endpoint and yields parsed chunks.
+ *
+ * Yields chunks with:
+ * - `token` — partial text token from the model
+ * - `agent` — agent switch notification
+ * - `thread_id` — final event (done)
+ * - `detail` — error detail
  */
 export async function* streamChat(
   message: string,
@@ -26,32 +32,12 @@ export async function* streamChat(
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
 
-  // Collect all chunks first, then yield them
-  // For large responses we stream token-by-token via a readable-stream approach
-  const allChunks: StreamChunk[] = []
-  let parseError: Error | null = null
-
-  const parser = createParser({
-    onEvent(event) {
-      try {
-        const chunk = JSON.parse(event.data) as StreamChunk
-        allChunks.push(chunk)
-      } catch {
-        // ignore non-JSON events
-      }
-    },
-  })
-
-  // We need real streaming — use a transform approach with manual iteration
-  // Re-implement using a simple push-based async iterable
-  yield* readSSEStream(reader, decoder, parser, allChunks)
+  yield* readSSEStream(reader, decoder)
 }
 
 async function* readSSEStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  decoder: TextDecoder,
-  parser: ReturnType<typeof createParser>,
-  _unused: StreamChunk[]
+  decoder: TextDecoder
 ): AsyncGenerator<StreamChunk, void, unknown> {
   // Buffer incoming parsed events
   const buffer: StreamChunk[] = []
@@ -77,13 +63,31 @@ async function* readSSEStream(
     }
   }
 
-  // Override parser to push into buffer
+  // Live parser handles all SSE event types
   const liveParser = createParser({
     onEvent(event) {
       try {
-        push(JSON.parse(event.data) as StreamChunk)
+        const data = JSON.parse(event.data)
+
+        switch (event.event) {
+          case "agent":
+            push({ agent: data.agent })
+            break
+          case "token":
+            push({ token: data.token })
+            break
+          case "done":
+            push({ thread_id: data.thread_id })
+            break
+          case "error":
+            push({ detail: data.detail })
+            break
+          default:
+            // Unknown event type — try to parse generically
+            push(data as StreamChunk)
+        }
       } catch {
-        /* skip */
+        /* skip non-JSON events */
       }
     },
   })

@@ -4,12 +4,13 @@ import { useCallback, useRef, useState } from "react"
 import { v4 as uuidv4 } from "uuid"
 
 import { streamChat } from "@/lib/api"
-import { type ChatMessage } from "@/lib/types"
+import { type AgentName, type ChatMessage } from "@/lib/types"
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentAgent, setCurrentAgent] = useState<AgentName | null>(null)
   const threadIdRef = useRef<string>(uuidv4())
 
   const sendMessage = useCallback(async (content: string) => {
@@ -24,8 +25,9 @@ export function useChat() {
       createdAt: new Date(),
     }
 
+    const assistantMessageId = uuidv4()
     const assistantMessage: ChatMessage = {
-      id: uuidv4(),
+      id: assistantMessageId,
       role: "assistant",
       content: "",
       createdAt: new Date(),
@@ -36,6 +38,24 @@ export function useChat() {
 
     try {
       for await (const chunk of streamChat(content.trim(), threadIdRef.current)) {
+        // Handle agent switch events
+        if (chunk.agent) {
+          setCurrentAgent(chunk.agent)
+          // Update the current assistant message with the new agent
+          setMessages((prev) => {
+            const updated = [...prev]
+            const last = updated[updated.length - 1]
+            if (last.role === "assistant") {
+              updated[updated.length - 1] = {
+                ...last,
+                agent: chunk.agent,
+              }
+            }
+            return updated
+          })
+        }
+
+        // Handle token events
         if (chunk.token) {
           setMessages((prev) => {
             const updated = [...prev]
@@ -67,12 +87,14 @@ export function useChat() {
     threadIdRef.current = uuidv4()
     setMessages([])
     setError(null)
+    setCurrentAgent(null)
   }, [])
 
   return {
     messages,
     isStreaming,
     error,
+    currentAgent,
     threadId: threadIdRef.current,
     sendMessage,
     resetThread,

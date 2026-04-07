@@ -5,16 +5,18 @@ import { Bot, User } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+import { AgentBadge } from "@/components/chat/agent-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { type ChatMessage } from "@/lib/types"
+import { type AgentName, type ChatMessage } from "@/lib/types"
 
 interface MessageListProps {
   messages: ChatMessage[]
   isStreaming: boolean
+  currentAgent: AgentName | null
 }
 
-export function MessageList({ messages, isStreaming }: MessageListProps) {
+export function MessageList({ messages, isStreaming, currentAgent }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -26,9 +28,9 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-muted-foreground">
         <Bot className="size-12 opacity-30" />
         <div>
-          <p className="text-base font-medium">Multi-Agent Starter</p>
+          <p className="text-base font-medium">Customer Support</p>
           <p className="text-sm">
-            Ask anything — the agent can tell the time or do math.
+            Ask about orders, products, accounts, or general questions.
           </p>
         </div>
       </div>
@@ -43,6 +45,7 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
         ))}
         {isStreaming && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {currentAgent && <AgentBadge agent={currentAgent} />}
             <span className="inline-flex gap-1">
               <span className="animate-bounce [animation-delay:-0.3s]">●</span>
               <span className="animate-bounce [animation-delay:-0.15s]">●</span>
@@ -73,22 +76,29 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
       </div>
 
-      {/* Bubble */}
-      <div
-        className={cn(
-          "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
-          isUser
-            ? "rounded-tr-sm bg-primary text-primary-foreground"
-            : "rounded-tl-sm bg-muted text-foreground"
+      {/* Bubble + badge */}
+      <div className="flex max-w-[80%] flex-col gap-1">
+        {/* Agent badge — only on assistant messages */}
+        {!isUser && message.agent && (
+          <AgentBadge agent={message.agent} className="w-fit" />
         )}
-      >
-        {!message.content ? (
-          <span className="italic opacity-60">Thinking…</span>
-        ) : isUser ? (
-          <span className="whitespace-pre-wrap">{message.content}</span>
-        ) : (
-          <MarkdownContent content={message.content} />
-        )}
+
+        <div
+          className={cn(
+            "rounded-2xl px-4 py-2.5 text-sm",
+            isUser
+              ? "rounded-tr-sm bg-primary text-primary-foreground"
+              : "rounded-tl-sm bg-muted text-foreground"
+          )}
+        >
+          {!message.content ? (
+            <span className="italic opacity-60">Thinking...</span>
+          ) : isUser ? (
+            <span className="whitespace-pre-wrap">{message.content}</span>
+          ) : (
+            <MarkdownContent content={message.content} />
+          )}
+        </div>
       </div>
     </div>
   )
