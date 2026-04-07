@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
-
-from api.agent.graph import build_graph
 
 logger = logging.getLogger(__name__)
 

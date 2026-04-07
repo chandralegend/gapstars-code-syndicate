@@ -18,7 +18,6 @@ from api.agent.tools.technical_tools import TECHNICAL_TOOLS
 from api.agent.tools.triage_tools import TRIAGE_TOOLS
 from api.config import settings
 
-
 # ── Routing tool (used by the Triage agent to delegate) ──────────────────────
 
 

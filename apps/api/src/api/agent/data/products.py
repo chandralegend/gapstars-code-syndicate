@@ -13,7 +13,8 @@ PRODUCTS: dict[str, dict] = {
             {
                 "issue": "Won't turn on",
                 "steps": [
-                    "Ensure the headphones are charged — connect the USB-C cable for at least 30 minutes.",
+                    "Ensure the headphones are charged — connect the "
+                    "USB-C cable for at least 30 minutes.",
                     "Press and hold the power button for 5 seconds.",
                     "If the LED does not light up, try a different USB-C cable.",
                     "Perform a factory reset by holding Power + Volume Down for 10 seconds.",
@@ -31,7 +32,8 @@ PRODUCTS: dict[str, dict] = {
             {
                 "issue": "Microphone not working",
                 "steps": [
-                    "Check that the headphones are selected as the input device in your OS audio settings.",
+                    "Check that the headphones are selected as the "
+                    "input device in your OS audio settings.",
                     "Toggle the mute switch on the left ear cup.",
                     "Restart the headphones and re-pair with your device.",
                 ],
@@ -43,7 +45,10 @@ PRODUCTS: dict[str, dict] = {
         "name": "Smart Home Hub",
         "category": "Smart Home",
         "price": 199.99,
-        "description": "Central hub for controlling all your smart home devices. Supports Zigbee, Z-Wave, and Wi-Fi.",
+        "description": (
+            "Central hub for controlling all your smart home devices. "
+            "Supports Zigbee, Z-Wave, and Wi-Fi."
+        ),
         "troubleshooting": [
             {
                 "issue": "Hub not connecting to Wi-Fi",
