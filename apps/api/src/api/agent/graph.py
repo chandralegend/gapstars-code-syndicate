@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, RemoveMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -43,7 +43,8 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     Architecture:
         START -> triage (supervisor)
         triage -> triage_tools -> triage  (ReAct loop for FAQ etc.)
-        triage -> order_support | technical_support  (delegation)
+        triage -> handoff_to_order | handoff_to_tech  (delegation)
+        handoff_* strips the route_to_agent tool call from messages
         order_support -> order_tools -> order_support  (ReAct loop)
         technical_support -> tech_tools -> technical_support  (ReAct loop)
         order_support | technical_support -> END
@@ -82,6 +83,29 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
         response = await triage_llm.ainvoke(messages)
         return {"messages": [response], "current_agent": "triage"}
 
+    def handoff_node(state: AgentState) -> AgentState:
+        """Remove the triage AI message that contains the route_to_agent tool call.
+
+        This prevents the specialist agent from seeing an orphaned tool_calls
+        message without a corresponding tool response, which would cause an
+        OpenAI API error.
+
+        Any text content from triage's routing message (e.g. "Let me connect you
+        with our order specialist...") is preserved as a plain AI message.
+        """
+        last: AIMessage = state["messages"][-1]
+        text_content = last.content or ""
+
+        # Remove the routing message (it has tool_calls the specialist can't see)
+        updates: list = [RemoveMessage(id=last.id)]
+
+        # If triage said something useful (e.g. acknowledgment), keep it as
+        # a clean AI message without tool_calls
+        if text_content.strip():
+            updates.append(AIMessage(content=text_content))
+
+        return {"messages": updates}
+
     async def order_support_node(state: AgentState) -> AgentState:
         """Order support specialist agent."""
         messages = [SystemMessage(content=ORDER_SUPPORT_PROMPT)] + state["messages"]
@@ -98,10 +122,15 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
 
     def triage_router(
         state: AgentState,
-    ) -> Literal["triage_tools", "order_support", "technical_support", "__end__"]:
+    ) -> Literal[
+        "triage_tools",
+        "handoff_to_order",
+        "handoff_to_tech",
+        "__end__",
+    ]:
         """Decide where to go after the triage node.
 
-        - If triage called route_to_agent -> delegate to specialist
+        - If triage called route_to_agent -> handoff (clean up, then delegate)
         - If triage called other tools (e.g. lookup_faq) -> run triage_tools
         - If no tool calls -> end (triage handled it directly)
         """
@@ -114,14 +143,16 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
             if tc["name"] == "route_to_agent":
                 agent_name = tc["args"].get("agent_name", "")
                 if agent_name == "order_support":
-                    return "order_support"
+                    return "handoff_to_order"
                 if agent_name == "technical_support":
-                    return "technical_support"
+                    return "handoff_to_tech"
 
         # Other tool calls (e.g. lookup_faq) go through triage's tool node
         return "triage_tools"
 
-    def specialist_router(state: AgentState) -> Literal["order_tools", "tech_tools", "__end__"]:
+    def specialist_router(
+        state: AgentState,
+    ) -> Literal["order_tools", "tech_tools", "__end__"]:
         """Route specialist agents to their tools or end."""
         last: AIMessage = state["messages"][-1]
         if not hasattr(last, "tool_calls") or not last.tool_calls:
@@ -141,6 +172,8 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     # Add nodes
     graph.add_node("triage", triage_node)
     graph.add_node("triage_tools", triage_tool_node)
+    graph.add_node("handoff_to_order", handoff_node)
+    graph.add_node("handoff_to_tech", handoff_node)
     graph.add_node("order_support", order_support_node)
     graph.add_node("order_tools", order_tool_node)
     graph.add_node("technical_support", technical_support_node)
@@ -153,11 +186,15 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     graph.add_conditional_edges(
         "triage",
         triage_router,
-        ["triage_tools", "order_support", "technical_support", END],
+        ["triage_tools", "handoff_to_order", "handoff_to_tech", END],
     )
 
     # Triage tool results come back to triage
     graph.add_edge("triage_tools", "triage")
+
+    # Handoff nodes lead to their respective specialist
+    graph.add_edge("handoff_to_order", "order_support")
+    graph.add_edge("handoff_to_tech", "technical_support")
 
     # Specialist routing (tool loops)
     graph.add_conditional_edges(
