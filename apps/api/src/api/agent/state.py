@@ -12,3 +12,10 @@ class AgentState(TypedDict):
 
     messages: Annotated[list[BaseMessage], add_messages]
     """Conversation message history, automatically merged by LangGraph."""
+
+    current_agent: str
+    """Name of the agent currently handling the conversation.
+
+    One of: 'triage', 'order_support', 'technical_support'.
+    Used by the frontend to display agent badges.
+    """
