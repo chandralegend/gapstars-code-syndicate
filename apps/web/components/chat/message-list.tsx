@@ -5,6 +5,7 @@ import { Bot, User } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+import { ActivityLog } from "@/components/chat/activity-log"
 import { AgentBadge } from "@/components/chat/agent-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -44,7 +45,7 @@ export function MessageList({ messages, isStreaming, currentAgent }: MessageList
           <MessageBubble key={message.id} message={message} />
         ))}
         {isStreaming && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 pl-11 text-xs text-muted-foreground">
             {currentAgent && <AgentBadge agent={currentAgent} />}
             <span className="inline-flex gap-1">
               <span className="animate-bounce [animation-delay:-0.3s]">●</span>
@@ -63,43 +64,58 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user"
 
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
-      {/* Avatar */}
-      <div
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full",
-          isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
-        )}
-      >
-        {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
-      </div>
-
-      {/* Bubble + badge */}
-      <div className="flex max-w-[80%] flex-col gap-1">
-        {/* Agent badge — only on assistant messages */}
-        {!isUser && message.agent && (
-          <AgentBadge agent={message.agent} className="w-fit" />
-        )}
-
+    <div className="flex flex-col gap-1">
+      <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
+        {/* Avatar */}
         <div
           className={cn(
-            "rounded-2xl px-4 py-2.5 text-sm",
+            "flex size-8 shrink-0 items-center justify-center rounded-full",
             isUser
-              ? "rounded-tr-sm bg-primary text-primary-foreground"
-              : "rounded-tl-sm bg-muted text-foreground"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground"
           )}
         >
-          {!message.content ? (
-            <span className="italic opacity-60">Thinking...</span>
-          ) : isUser ? (
-            <span className="whitespace-pre-wrap">{message.content}</span>
-          ) : (
-            <MarkdownContent content={message.content} />
+          {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
+        </div>
+
+        {/* Bubble + badge */}
+        <div className="flex max-w-[80%] flex-col gap-1">
+          {/* Agent badge — only on assistant messages that have content */}
+          {!isUser && message.agent && message.content && (
+            <AgentBadge agent={message.agent} className="w-fit" />
+          )}
+
+          {/* Activity log — shown above the message bubble for assistant */}
+          {!isUser && message.activity.length > 0 && !message.content && (
+            <ActivityLog events={message.activity} className="pl-0" />
+          )}
+
+          {/* Message bubble */}
+          {(message.content || isUser) && (
+            <div
+              className={cn(
+                "rounded-2xl px-4 py-2.5 text-sm",
+                isUser
+                  ? "rounded-tr-sm bg-primary text-primary-foreground"
+                  : "rounded-tl-sm bg-muted text-foreground"
+              )}
+            >
+              {!message.content ? (
+                <span className="italic opacity-60">Thinking...</span>
+              ) : isUser ? (
+                <span className="whitespace-pre-wrap">{message.content}</span>
+              ) : (
+                <MarkdownContent content={message.content} />
+              )}
+            </div>
           )}
         </div>
       </div>
+
+      {/* Activity log — shown below the bubble when there IS content */}
+      {!isUser && message.activity.length > 0 && message.content && (
+        <ActivityLog events={message.activity} />
+      )}
     </div>
   )
 }
@@ -109,11 +125,9 @@ function MarkdownContent({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        // Paragraphs — tight spacing inside bubbles
         p: ({ children }) => (
           <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
         ),
-        // Headings
         h1: ({ children }) => (
           <h1 className="mb-2 mt-3 text-base font-bold first:mt-0">{children}</h1>
         ),
@@ -123,7 +137,6 @@ function MarkdownContent({ content }: { content: string }) {
         h3: ({ children }) => (
           <h3 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h3>
         ),
-        // Inline code
         code: ({ className, children, ...props }) => {
           const isBlock = className?.includes("language-")
           if (isBlock) {
@@ -148,13 +161,11 @@ function MarkdownContent({ content }: { content: string }) {
             </code>
           )
         },
-        // Code blocks
         pre: ({ children }) => (
           <pre className="mb-2 mt-1 overflow-x-auto rounded-md bg-black/10 dark:bg-white/10">
             {children}
           </pre>
         ),
-        // Lists
         ul: ({ children }) => (
           <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>
         ),
@@ -162,15 +173,12 @@ function MarkdownContent({ content }: { content: string }) {
           <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>
         ),
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-        // Blockquote
         blockquote: ({ children }) => (
           <blockquote className="my-2 border-l-2 border-current pl-3 opacity-70">
             {children}
           </blockquote>
         ),
-        // Horizontal rule
         hr: () => <hr className="my-2 border-current opacity-20" />,
-        // Links
         a: ({ href, children }) => (
           <a
             href={href}
@@ -181,12 +189,10 @@ function MarkdownContent({ content }: { content: string }) {
             {children}
           </a>
         ),
-        // Bold / italic
         strong: ({ children }) => (
           <strong className="font-semibold">{children}</strong>
         ),
         em: ({ children }) => <em className="italic">{children}</em>,
-        // Tables (GFM)
         table: ({ children }) => (
           <div className="my-2 overflow-x-auto">
             <table className="w-full border-collapse text-xs">{children}</table>

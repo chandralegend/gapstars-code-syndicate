@@ -7,7 +7,9 @@ import { API_URL, type StreamChunk } from "@/lib/types"
  *
  * Yields chunks with:
  * - `token` — partial text token from the model
- * - `agent` — agent switch notification
+ * - `agent` / `agentFrom` — agent switch notification
+ * - `toolCall` — tool invocation started
+ * - `toolResult` — tool finished with result
  * - `thread_id` — final event (done)
  * - `detail` — error detail
  */
@@ -39,7 +41,6 @@ async function* readSSEStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   decoder: TextDecoder
 ): AsyncGenerator<StreamChunk, void, unknown> {
-  // Buffer incoming parsed events
   const buffer: StreamChunk[] = []
   let resolveNext: ((value: IteratorResult<StreamChunk>) => void) | null = null
   let streamDone = false
@@ -63,7 +64,6 @@ async function* readSSEStream(
     }
   }
 
-  // Live parser handles all SSE event types
   const liveParser = createParser({
     onEvent(event) {
       try {
@@ -71,7 +71,27 @@ async function* readSSEStream(
 
         switch (event.event) {
           case "agent":
-            push({ agent: data.agent })
+            push({ agent: data.agent, agentFrom: data.from ?? null })
+            break
+          case "tool_call":
+            push({
+              toolCall: {
+                tool: data.tool,
+                toolLabel: data.tool_label,
+                args: data.args,
+                agent: data.agent,
+              },
+            })
+            break
+          case "tool_result":
+            push({
+              toolResult: {
+                tool: data.tool,
+                toolLabel: data.tool_label,
+                result: data.result,
+                agent: data.agent,
+              },
+            })
             break
           case "token":
             push({ token: data.token })
@@ -83,7 +103,6 @@ async function* readSSEStream(
             push({ detail: data.detail })
             break
           default:
-            // Unknown event type — try to parse generically
             push(data as StreamChunk)
         }
       } catch {
@@ -92,7 +111,6 @@ async function* readSSEStream(
     },
   })
 
-  // Read stream in the background
   const reading = (async () => {
     try {
       for (;;) {
@@ -105,7 +123,6 @@ async function* readSSEStream(
     }
   })()
 
-  // Yield from the live buffer
   for (;;) {
     if (buffer.length > 0) {
       yield buffer.shift()!
