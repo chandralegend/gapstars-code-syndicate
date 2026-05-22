@@ -10,8 +10,6 @@ export interface AgentNode {
   desc: string
   status: NodeStatus
   elapsed?: string
-  tokens?: string
-  cost?: string
   progress?: number
 }
 
@@ -21,7 +19,6 @@ export interface GateNode {
   agent?: undefined
   name: string
   status: NodeStatus
-  approver?: string
   when?: string
   desc?: undefined
 }
@@ -75,9 +72,7 @@ export interface RunSummary {
   status: RunStatus
   started: string
   duration: string
-  cost: string
   cases: string
-  by: string
 }
 
 export type ScriptLang = "Playwright" | "Pytest"

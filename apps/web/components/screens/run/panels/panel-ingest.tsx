@@ -7,7 +7,7 @@ export function PanelIngest() {
       <PanelHead
         num="00"
         title="Ingest & plan"
-        desc="Validate context, draft run plan, allocate budget"
+        desc="Validate context, draft run plan"
         right={<Badge variant="ok">done · 3.1s</Badge>}
       />
       <PanelBody>
@@ -19,8 +19,8 @@ export function PanelIngest() {
             Run plan
           </h2>
           <p className="text-ink-2 mt-2 text-[14px] leading-relaxed">
-            3-agent graph with two HITL gates. Budget capped at $2.00. Sandbox:
-            E2B firecracker, 2 vCPU / 4 GB.
+            3-agent graph with two HITL gates. Sandbox: E2B firecracker, 2 vCPU
+            / 4 GB.
           </p>
           <h3 className="text-ink-3 mt-6 mb-2 text-[12px] font-semibold tracking-wider uppercase">
             Inputs received
@@ -48,13 +48,6 @@ export function PanelIngest() {
               </code>
             </li>
             <li>Personas: 2 (Authenticated shopper, Anonymous shopper)</li>
-            <li>
-              Credentials:{" "}
-              <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-[12px]">
-                staging.acme.shop
-              </code>{" "}
-              seed user, read-only token
-            </li>
           </ul>
           <h3 className="text-ink-3 mt-6 mb-2 text-[12px] font-semibold tracking-wider uppercase">
             Graph plan

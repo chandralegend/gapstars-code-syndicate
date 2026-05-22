@@ -29,16 +29,13 @@ const statusMap = {
 
 export default function TestsPage() {
   const router = useRouter()
-  useSetBreadcrumbs([
-    { label: "acme/shop", muted: true },
-    { label: "Tests" },
-  ])
+  useSetBreadcrumbs([{ label: "Tests" }])
 
   return (
     <>
       <PageHead
         title="Tests"
-        sub="5 tests · acme/shop · staging.acme.shop"
+        sub="5 tests"
         actions={
           <>
             <div className="border-border bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
@@ -62,15 +59,9 @@ export default function TestsPage() {
       />
 
       <div className="max-w-[1200px] px-6 py-6">
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
           <StatCard label="Tests" value="5" delta="+1 this week" />
           <StatCard label="Scripts" value="43" delta="91% pass rate" deltaKind="up" />
-          <StatCard
-            label="Cost this month"
-            value="$48.12"
-            unit="of $200 cap"
-            delta="$1.91/run avg"
-          />
         </div>
 
         <div className="mb-3 flex items-end justify-between">

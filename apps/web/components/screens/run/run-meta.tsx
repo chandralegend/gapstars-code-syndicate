@@ -15,7 +15,7 @@ export function RunMeta({ runId }: { runId: string }) {
       </Row>
       <Row label="Test">Saved Carts — Cross-Device Persistence</Row>
       <Row label="Started">
-        <span className="font-mono">2 min ago · by Mira Chen</span>
+        <span className="font-mono">2 min ago</span>
       </Row>
       <Row label="Node">
         <span className="font-mono">agent_2.workspace</span>

@@ -357,7 +357,7 @@ function LiveScreenBody() {
             ))}
           </div>
           <div className="border-border bg-card ml-2 rounded px-2 py-0.5 font-mono text-[11px]">
-            https://staging.acme.shop/cart
+            https://staging.example.com/cart
           </div>
           <Tag>chromium 124</Tag>
         </div>

@@ -26,17 +26,14 @@ const STATUS_MAP = {
 }
 
 export default function RunsPage() {
-  useSetBreadcrumbs([
-    { label: "acme/shop", muted: true },
-    { label: "Run history" },
-  ])
+  useSetBreadcrumbs([{ label: "Run history" }])
   const router = useRouter()
 
   return (
     <>
       <PageHead
         title="Runs"
-        sub="Across all tests in acme/shop · 142 total this month"
+        sub="142 total this month"
         actions={
           <>
             <Button variant="ghost" size="sm">
@@ -83,8 +80,6 @@ export default function RunsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Cases</TableHead>
-                <TableHead>Cost</TableHead>
-                <TableHead>By</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -109,8 +104,6 @@ export default function RunsPage() {
                     </TableCell>
                     <TableCell className="font-mono">{r.duration}</TableCell>
                     <TableCell className="font-mono">{r.cases}</TableCell>
-                    <TableCell className="font-mono">{r.cost}</TableCell>
-                    <TableCell>{r.by}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm">
                         Open
