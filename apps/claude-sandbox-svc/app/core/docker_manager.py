@@ -98,13 +98,18 @@ def start_sandbox(
     # Convert "1.5" CPUs to nano CPUs.
     nano_cpus = int(float(settings.sandbox_cpus) * 1_000_000_000)
 
+    # Translate the in-container task_dir to the host path the host Docker
+    # daemon will see when bind-mounting into the per-task container. When
+    # running on the host directly (HOST_DATA_DIR unset) this is a no-op.
+    host_task_dir = settings.host_path_for(task_dir)
+
     try:
         container: Container = client.containers.run(
             image=settings.sandbox_image,
             name=name,
             detach=True,
             environment=env,
-            volumes={str(task_dir): {"bind": "/task", "mode": "rw"}},
+            volumes={host_task_dir: {"bind": "/task", "mode": "rw"}},
             ports={"6080/tcp": (settings.vnc_bind_host, vnc_port)},
             mem_limit=settings.sandbox_mem_limit,
             nano_cpus=nano_cpus,
@@ -115,7 +120,13 @@ def start_sandbox(
     except APIError as e:
         raise DockerUnavailable(f"failed to start sandbox container: {e}") from e
 
-    logger.info("started container %s for task %s on vnc port %d", container.id, task_id, vnc_port)
+    logger.info(
+        "started container %s for task %s on vnc port %d (host mount: %s)",
+        container.id,
+        task_id,
+        vnc_port,
+        host_task_dir,
+    )
     return StartedContainer(
         container_id=container.id,
         container_name=name,

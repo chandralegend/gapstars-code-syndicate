@@ -96,6 +96,7 @@ services:
       DEFAULT_TIMEOUT_SECONDS: ${DEFAULT_TIMEOUT_SECONDS:-1800}
       RETENTION_DAYS: ${RETENTION_DAYS:-7}
       DATA_DIR: /data
+      HOST_DATA_DIR: ${PWD}/apps/claude-sandbox-svc/data
       PUBLIC_BASE_URL: ${SANDBOX_PUBLIC_BASE_URL:-http://localhost:8100}
       VNC_PROXY_MODE: ${VNC_PROXY_MODE:-proxy}
       VNC_BIND_HOST: ${VNC_BIND_HOST:-127.0.0.1}
@@ -107,7 +108,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Per-task artifacts live on the host so they survive restarts and so
       # the spawned sandbox containers can bind-mount them by absolute host path.
-      - sandbox_data:/data
+      # Must be a host bind-mount (not a named volume) so paths inside this
+      # container map 1:1 to a real host directory the host's Docker daemon
+      # can mount into the per-task containers.
+      - ./apps/claude-sandbox-svc/data:/data
     develop:
       watch:
         - action: sync
@@ -119,4 +123,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  sandbox_data:
