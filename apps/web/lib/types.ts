@@ -1,111 +1,111 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
-export type AgentName = "triage" | "order_support" | "technical_support"
+export type NodeStatus = "idle" | "running" | "done" | "err" | "wait"
 
-// ── LLM provider types ───────────────────────────────────────────────────────
+export interface AgentNode {
+  id: string
+  kind?: undefined
+  agent: string
+  name: string
+  desc: string
+  status: NodeStatus
+  elapsed?: string
+  tokens?: string
+  cost?: string
+  progress?: number
+}
 
-export type LLMProviderName = "openai" | "mistral" | "anthropic"
+export interface GateNode {
+  id: string
+  kind: "gate"
+  agent?: undefined
+  name: string
+  status: NodeStatus
+  approver?: string
+  when?: string
+  desc?: undefined
+}
 
-export interface ModelInfo {
+export type RunNode = AgentNode | GateNode
+
+export interface FeatureSpec {
+  title: string
+  lede: string
+  what: string[]
+  flows: string[]
+  contracts: string[]
+  acceptance: string[]
+}
+
+export type TestCaseKind = "happy" | "edge" | "corner"
+export type TestPriority = "P0" | "P1" | "P2"
+
+export interface TestCase {
+  id: string
+  title: string
+  desc: string
+  steps?: string[]
+  expect: string
+  priority: TestPriority
+  kind: TestCaseKind
+}
+
+export interface WorkspaceNode {
+  kind: "folder" | "file"
+  path: string
+  depth: number
+  open?: boolean
+  active?: boolean
+  isNew?: boolean
+}
+
+export type AgentEventKind = "thought" | "http" | "tool" | "fs"
+
+export interface AgentEvent {
+  t: string
+  kind: AgentEventKind
+  msg: string
+}
+
+export type RunStatus = "running" | "done" | "err"
+
+export interface RunSummary {
+  id: string
+  test: string
+  status: RunStatus
+  started: string
+  duration: string
+  cost: string
+  cases: string
+  by: string
+}
+
+export type ScriptLang = "Playwright" | "Pytest"
+export type ScriptStatus = "passed" | "failed" | "draft"
+
+export interface Script {
   id: string
   name: string
+  lang: ScriptLang
+  lastRun: string
+  status: ScriptStatus
+  duration: string
 }
 
-export interface ProviderInfo {
-  id: LLMProviderName
-  name: string
-  available: boolean
-  default_model: string
-  models: ModelInfo[]
-}
-
-export interface ProvidersResponse {
-  providers: ProviderInfo[]
-  default_provider: LLMProviderName
-}
-
-export const PROVIDER_DISPLAY: Record<
-  LLMProviderName,
-  { label: string; icon: string; color: string; textColor: string }
-> = {
-  openai: {
-    label: "OpenAI",
-    icon: "openai",
-    color: "bg-emerald-100 dark:bg-emerald-900/40",
-    textColor: "text-emerald-700 dark:text-emerald-300",
-  },
-  mistral: {
-    label: "Mistral AI",
-    icon: "mistral",
-    color: "bg-orange-100 dark:bg-orange-900/40",
-    textColor: "text-orange-700 dark:text-orange-300",
-  },
-  anthropic: {
-    label: "Anthropic",
-    icon: "anthropic",
-    color: "bg-amber-100 dark:bg-amber-900/40",
-    textColor: "text-amber-700 dark:text-amber-300",
-  },
-}
-
-// ── Activity events (agent transitions, tool calls) ─────────────────────────
-
-export type ActivityEvent =
-  | { type: "agent_switch"; agent: AgentName; from: AgentName | null; timestamp: Date }
-  | { type: "tool_call"; tool: string; toolLabel: string; args: Record<string, unknown>; agent: AgentName; timestamp: Date }
-  | { type: "tool_result"; tool: string; toolLabel: string; result: string; agent: AgentName; timestamp: Date }
-
-// ── Chat messages ───────────────────────────────────────────────────────────
-
-export interface ChatMessage {
+export interface TestRow {
   id: string
-  role: "user" | "assistant"
-  content: string
-  createdAt: Date
-  agent?: AgentName
-  provider?: LLMProviderName
-  model?: string
-  /** Activity events that occurred during this assistant response */
-  activity: ActivityEvent[]
+  name: string
+  desc: string
+  lastRun: string
+  status: "running" | "passed" | "failed"
+  cases: number
+  scripts: number
+  runs: number
 }
 
-// ── SSE stream chunks ───────────────────────────────────────────────────────
-
-export interface StreamChunk {
-  // Token event
-  token?: string
-  // Done event
-  thread_id?: string
-  // Error event
-  detail?: string
-  // Agent switch event
-  agent?: AgentName
-  agentFrom?: AgentName | null
-  // Tool call event
-  toolCall?: { tool: string; toolLabel: string; args: Record<string, unknown>; agent: AgentName }
-  // Tool result event
-  toolResult?: { tool: string; toolLabel: string; result: string; agent: AgentName }
-}
-
-// ── Agent display config ────────────────────────────────────────────────────
-
-export const AGENT_DISPLAY: Record<
-  AgentName,
-  { label: string; color: string; bgMuted: string }
-> = {
-  triage: {
-    label: "Triage",
-    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    bgMuted: "border-blue-200 dark:border-blue-800",
-  },
-  order_support: {
-    label: "Order Support",
-    color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-    bgMuted: "border-amber-200 dark:border-amber-800",
-  },
-  technical_support: {
-    label: "Tech Support",
-    color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-    bgMuted: "border-emerald-200 dark:border-emerald-800",
-  },
+export interface BreadcrumbItem {
+  label: string
+  muted?: boolean
+  mono?: boolean
+  href?: string
 }
