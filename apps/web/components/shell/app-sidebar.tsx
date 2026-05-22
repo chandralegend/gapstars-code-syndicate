@@ -1,11 +1,11 @@
 "use client"
 
+import { useCallback } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   ActivityIcon,
   ChevronLeftIcon,
-  CodeIcon,
   FlaskConicalIcon,
   FolderIcon,
   HistoryIcon,
@@ -27,7 +27,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { getProject } from "@/lib/mock/projects"
+import { getProject, useFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 type NavItem = {
@@ -44,7 +44,8 @@ const TOP: NavItem[] = [
     icon: FolderIcon,
     label: "Projects",
     match: (p) =>
-      p === "/projects" || (p.startsWith("/projects") && p.split("/").length === 2),
+      p === "/projects" ||
+      (p.startsWith("/projects") && p.split("/").length === 2),
   },
 ]
 
@@ -76,12 +77,6 @@ function buildProjectNav(projectId: string): NavItem[] {
       match: (p) => p === `${base}/runs`,
     },
     {
-      href: `${base}/scripts`,
-      icon: CodeIcon,
-      label: "Scripts",
-      match: (p) => p.startsWith(`${base}/scripts`),
-    },
-    {
       href: `${base}/settings`,
       icon: Settings2Icon,
       label: "Settings",
@@ -102,7 +97,6 @@ function ProbeMark() {
 }
 
 function projectIdFromPath(pathname: string): string | null {
-  // /projects/[projectId]/...
   const m = pathname.match(/^\/projects\/([^/]+)(?:\/|$)/)
   return m ? m[1] : null
 }
@@ -112,7 +106,14 @@ export function AppSidebar() {
   const router = useRouter()
 
   const projectId = projectIdFromPath(pathname)
-  const project = projectId ? getProject(projectId) : null
+  const projectQ = useFetch(
+    useCallback(
+      async () => (projectId ? getProject(projectId) : null),
+      [projectId],
+    ),
+    [projectId],
+  )
+  const project = projectQ.data
   const projectNav = projectId ? buildProjectNav(projectId) : []
 
   const renderNav = (items: NavItem[]) =>
@@ -129,7 +130,7 @@ export function AppSidebar() {
             tooltip={it.label}
             className={cn(
               "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
-              "hover:bg-sidebar-accent/70"
+              "hover:bg-sidebar-accent/70",
             )}
           >
             <Icon className="size-[15px] opacity-85" />
@@ -140,7 +141,7 @@ export function AppSidebar() {
                   "ml-auto font-mono text-[10.5px]",
                   active
                     ? "bg-accent text-sidebar"
-                    : "bg-sidebar-border text-sidebar-foreground/60"
+                    : "bg-sidebar-border text-sidebar-foreground/60",
                 )}
               >
                 {it.badge}
@@ -177,7 +178,7 @@ export function AppSidebar() {
                 {project.name}
               </span>
               <span className="text-sidebar-foreground/60 block truncate text-[11px]">
-                {project.stagingUrl}
+                {project.id.slice(0, 8)}
               </span>
             </span>
             <ChevronLeftIcon className="text-sidebar-foreground/50 size-[13px] transition-transform group-hover/proj:-translate-x-0.5" />
