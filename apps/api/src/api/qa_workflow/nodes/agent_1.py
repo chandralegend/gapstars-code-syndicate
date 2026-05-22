@@ -12,7 +12,7 @@ from api.qa_workflow.prompts.agent_1_prompt import (
     build_revision_prompt,
 )
 from api.qa_workflow.state import QAWorkflowState
-from api.services import feature_expectation_service, run_service
+from api.services import agent_event_service, feature_expectation_service, run_service
 
 
 def make_agent_1_node(llm: BaseChatModel):
@@ -26,6 +26,16 @@ def make_agent_1_node(llm: BaseChatModel):
         async with async_session_maker() as session:
             await run_service.update_status(
                 session, run_id, RunStatus.AGENT1_RUNNING.value, "agent_1_generate"
+            )
+            await agent_event_service.create(
+                session,
+                run_id,
+                node_name="agent_1_generate",
+                event_type="node_start",
+                payload={
+                    "is_revision": bool(is_revision),
+                    "previous_version": current_version,
+                },
             )
 
         if is_revision:
@@ -47,6 +57,14 @@ def make_agent_1_node(llm: BaseChatModel):
                 fe = await feature_expectation_service.create_next_version(
                     session, run_id, content
                 )
+
+            await agent_event_service.create(
+                session,
+                run_id,
+                node_name="agent_1_generate",
+                event_type="node_end",
+                payload={"version": fe.version, "is_revision": bool(is_revision)},
+            )
 
         return {
             "feature_expectation": content,

@@ -27,6 +27,16 @@ def make_agent_3_node(llm: BaseChatModel):
             await run_service.update_status(
                 session, run_id, RunStatus.AGENT3_RUNNING.value, "agent_3_generate"
             )
+            await agent_event_service.create(
+                session,
+                run_id,
+                node_name="agent_3_generate",
+                event_type="node_start",
+                payload={
+                    "is_revision": bool(is_revision),
+                    "previous_version": current_version,
+                },
+            )
 
         if is_revision:
             user_prompt = build_revision_prompt(state)

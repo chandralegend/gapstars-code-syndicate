@@ -35,6 +35,7 @@ class Run(SQLModel, table=True):
         sa_column=Column(String, nullable=False, default=RunStatus.PENDING.value),
     )
     current_node: str | None = None
+    error: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 

@@ -14,6 +14,7 @@ class RunRead(BaseModel):
     thread_id: str
     status: RunStatus
     current_node: str | None
+    error: str | None
     created_at: datetime
     updated_at: datetime
 

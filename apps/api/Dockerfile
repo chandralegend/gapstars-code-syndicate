@@ -25,6 +25,11 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 
+# Alembic config + migrations need to live in the image so we can run
+# `alembic upgrade head` inside the container at deploy time.
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
+
 # Activate the venv by prepending it to PATH
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \

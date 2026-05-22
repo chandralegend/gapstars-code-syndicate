@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: str = "http://localhost:3000"
 
+    # ── claude-sandbox-svc (Agent 2 substrate) ────────────────────────────────
+    sandbox_base_url: str = "http://claude-sandbox-svc:8000"
+    sandbox_enabled: bool = True
+    sandbox_default_timeout_seconds: int = 1800
+    sandbox_poll_interval_seconds: float = 3.0
+    sandbox_default_model: str = "claude-sonnet-4-5-20250929"
+    sandbox_max_iterations: int = 50
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
