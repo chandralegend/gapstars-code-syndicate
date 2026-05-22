@@ -10,6 +10,7 @@ from api.agent.checkpointer import create_checkpointer
 from api.agent.graph import build_graph
 from api.agent.llm_factory import create_llm
 from api.config import settings
+from api.qa_workflow.graph import build_qa_graph
 from api.db.engine import engine as db_engine
 from api.routers import (
     agent_router,
@@ -42,6 +43,11 @@ async def lifespan(app: FastAPI):
     app.state.graphs[default_key] = build_graph(checkpointer=checkpointer, llm=default_llm)
 
     logger.info("Agent graph ready (default: %s)", default_key)
+
+    # QA workflow graph (shares the same checkpointer)
+    qa_llm = create_llm()
+    app.state.qa_graph = build_qa_graph(checkpointer=checkpointer, llm=qa_llm)
+    logger.info("QA workflow graph ready")
 
     yield
 
