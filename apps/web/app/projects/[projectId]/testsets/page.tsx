@@ -1,15 +1,13 @@
 "use client"
 
-import { use } from "react"
+import { use, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { notFound } from "next/navigation"
 import { ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon } from "lucide-react"
 
 import { CapLine } from "@/components/probe/cap-line"
 import { Kbd } from "@/components/probe/kbd"
 import { PageHead } from "@/components/probe/page-head"
 import { StatCard } from "@/components/probe/stat-card"
-import { StatusDot } from "@/components/probe/status-dot"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -20,15 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getProject } from "@/lib/mock/projects"
-import { TESTS } from "@/lib/mock/tests"
+import { getProject, listTestScenarios, useFetch } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
-
-const statusMap = {
-  running: "running",
-  passed: "done",
-  failed: "err",
-} as const
 
 export default function TestsetsListPage({
   params,
@@ -37,7 +28,18 @@ export default function TestsetsListPage({
 }) {
   const { projectId } = use(params)
   const router = useRouter()
-  const project = getProject(projectId)
+
+  const projectQ = useFetch(
+    useCallback(() => getProject(projectId), [projectId]),
+    [projectId],
+  )
+  const scenariosQ = useFetch(
+    useCallback(() => listTestScenarios(projectId), [projectId]),
+    [projectId],
+  )
+
+  const project = projectQ.data
+  const scenarios = scenariosQ.data ?? []
 
   useSetBreadcrumbs(
     project
@@ -49,16 +51,23 @@ export default function TestsetsListPage({
       : [{ label: "Projects", href: "/projects" }],
   )
 
-  if (!project) notFound()
-
-  // Demo: only the first project has the seeded test sets.
-  const testsets = project.id === "shop" ? TESTS : []
+  if (projectQ.error) {
+    return (
+      <div className="px-6 py-10 text-center">
+        <h1 className="text-[20px] font-semibold">Project not found</h1>
+        <p className="text-ink-3 mt-1 text-[13px]">{projectQ.error.message}</p>
+      </div>
+    )
+  }
+  if (!project) {
+    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+  }
 
   return (
     <>
       <PageHead
         title="Test sets"
-        sub={`${testsets.length} test set${testsets.length === 1 ? "" : "s"} in ${project.name}`}
+        sub={`${scenarios.length} test set${scenarios.length === 1 ? "" : "s"} in ${project.name}`}
         actions={
           <>
             <div className="border-border bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
@@ -88,16 +97,10 @@ export default function TestsetsListPage({
 
       <div className="max-w-[1200px] px-6 py-6">
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <StatCard label="Test sets" value={String(scenarios.length)} />
           <StatCard
-            label="Test sets"
-            value={String(testsets.length)}
-            delta="+1 this week"
-          />
-          <StatCard
-            label="Scripts"
-            value="43"
-            delta="91% pass rate"
-            deltaKind="up"
+            label="Drafts"
+            value={String(scenarios.filter((s) => s.status === "draft").length)}
           />
         </div>
 
@@ -110,7 +113,7 @@ export default function TestsetsListPage({
           </div>
         </div>
 
-        {testsets.length === 0 ? (
+        {scenarios.length === 0 ? (
           <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
             <div className="text-[15px] font-medium">No test sets yet</div>
             <div className="text-ink-3 mt-1 text-[13px]">
@@ -132,16 +135,14 @@ export default function TestsetsListPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">Test set</TableHead>
-                  <TableHead>Last run</TableHead>
-                  <TableHead>Cases</TableHead>
-                  <TableHead>Scripts</TableHead>
-                  <TableHead>Runs</TableHead>
+                  <TableHead className="w-[55%]">Test set</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {testsets.map((t) => (
+                {scenarios.map((t) => (
                   <TableRow
                     key={t.id}
                     className="cursor-pointer"
@@ -150,20 +151,17 @@ export default function TestsetsListPage({
                     }
                   >
                     <TableCell>
-                      <div className="font-medium">{t.name}</div>
-                      <div className="text-ink-3 mt-0.5 text-[12px]">
-                        {t.desc}
+                      <div className="font-medium">{t.title}</div>
+                      <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
+                        {t.feature_description}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="flex items-center gap-2 text-[12.5px]">
-                        <StatusDot kind={statusMap[t.status]} />
-                        {t.lastRun}
-                      </span>
+                      <span className="font-mono text-[12px]">{t.status}</span>
                     </TableCell>
-                    <TableCell className="font-mono">{t.cases}</TableCell>
-                    <TableCell className="font-mono">{t.scripts}</TableCell>
-                    <TableCell className="font-mono">{t.runs}</TableCell>
+                    <TableCell className="text-ink-3 text-[12.5px]">
+                      {new Date(t.created_at).toLocaleString()}
+                    </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm">
                         Open

@@ -1,12 +1,10 @@
 "use client"
 
-import { use } from "react"
+import { use, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { notFound } from "next/navigation"
 import {
   ActivityIcon,
   ChevronRightIcon,
-  CodeIcon,
   FlaskConicalIcon,
   PlusIcon,
   Settings2Icon,
@@ -15,10 +13,13 @@ import {
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
 import { StatCard } from "@/components/probe/stat-card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { getProject } from "@/lib/mock/projects"
-import { TESTS } from "@/lib/mock/tests"
+import {
+  getProject,
+  listRunsByProject,
+  listTestScenarios,
+  useFetch,
+} from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 
 export default function ProjectOverviewPage({
@@ -28,7 +29,24 @@ export default function ProjectOverviewPage({
 }) {
   const { projectId } = use(params)
   const router = useRouter()
-  const project = getProject(projectId)
+
+  const projectQ = useFetch(
+    useCallback(() => getProject(projectId), [projectId]),
+    [projectId],
+  )
+  const scenariosQ = useFetch(
+    useCallback(() => listTestScenarios(projectId), [projectId]),
+    [projectId],
+  )
+  const runsQ = useFetch(
+    useCallback(() => listRunsByProject(projectId), [projectId]),
+    [projectId],
+  )
+
+  const project = projectQ.data
+  const scenarios = scenariosQ.data ?? []
+  const runs = runsQ.data ?? []
+  const recentRuns = runs.length
 
   useSetBreadcrumbs(
     project
@@ -39,25 +57,24 @@ export default function ProjectOverviewPage({
       : [{ label: "Projects", href: "/projects" }, { label: projectId, mono: true }],
   )
 
-  if (!project) {
-    notFound()
+  if (projectQ.error) {
+    return (
+      <div className="px-6 py-10 text-center">
+        <h1 className="text-[20px] font-semibold">Project not found</h1>
+        <p className="text-ink-3 mt-1 text-[13px]">{projectQ.error.message}</p>
+      </div>
+    )
   }
 
-  // For demo, we treat TESTS as the test sets that belong to the *first* project.
-  const testsets = project.id === "shop" ? TESTS : []
+  if (!project) {
+    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+  }
 
   return (
     <>
       <PageHead
         title={project.name}
-        sub={
-          <span className="flex items-center gap-2">
-            <Badge variant={project.status === "active" ? "ok" : "muted"}>
-              {project.status}
-            </Badge>
-            <span>{project.description}</span>
-          </span>
-        }
+        sub={project.description}
         actions={
           <>
             <Button
@@ -83,19 +100,21 @@ export default function ProjectOverviewPage({
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           <StatCard
             label="Test sets"
-            value={String(testsets.length)}
-            delta={`${testsets.length === 0 ? "Create your first one" : "+1 this week"}`}
+            value={String(scenarios.length)}
+            delta={
+              scenarios.length === 0 ? "Create your first one" : "+ in this project"
+            }
           />
+          <StatCard label="Runs" value={String(recentRuns)} delta="lifetime" />
           <StatCard
-            label="Runs this week"
-            value={String(project.runsThisWeek)}
-            delta="+8 vs last week"
-            deltaKind={project.runsThisWeek > 0 ? "up" : undefined}
+            label="Tech stack"
+            value={
+              project.tech_stack ? project.tech_stack.split(",")[0]!.trim() : "—"
+            }
           />
-          <StatCard label="Staging" value={project.stagingUrl} />
         </div>
 
-        {testsets.length === 0 ? (
+        {scenarios.length === 0 ? (
           <EmptyState
             onCreate={() => router.push(`/projects/${project.id}/testsets/new`)}
           />
@@ -111,7 +130,9 @@ export default function ProjectOverviewPage({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push(`/projects/${project.id}/testsets`)}
+                onClick={() =>
+                  router.push(`/projects/${project.id}/testsets`)
+                }
               >
                 See all
                 <ChevronRightIcon className="size-[12px]" />
@@ -119,7 +140,7 @@ export default function ProjectOverviewPage({
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {testsets.slice(0, 3).map((t) => (
+              {scenarios.slice(0, 6).map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -131,19 +152,15 @@ export default function ProjectOverviewPage({
                   <div className="mb-1 flex items-center gap-2">
                     <FlaskConicalIcon className="text-ink-3 size-[14px]" />
                     <span className="text-ink-4 ml-auto font-mono text-[11px]">
-                      {t.id}
+                      {t.id.slice(0, 8)}
                     </span>
                   </div>
-                  <div className="text-[13.5px] font-medium">{t.name}</div>
+                  <div className="text-[13.5px] font-medium">{t.title}</div>
                   <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
-                    {t.desc}
+                    {t.feature_description}
                   </div>
                   <div className="text-ink-4 mt-3 flex items-center gap-2 font-mono text-[11px]">
-                    <span>{t.cases} cases</span>
-                    <span>·</span>
-                    <span>{t.scripts} scripts</span>
-                    <span>·</span>
-                    <span>{t.runs} runs</span>
+                    <span>{t.status}</span>
                   </div>
                 </button>
               ))}
@@ -152,17 +169,17 @@ export default function ProjectOverviewPage({
         )}
 
         <div className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Link
+          <NavCard
             label="Run history"
-            desc="Every run across this project"
+            desc={`${runs.length} runs across this project`}
             icon={<ActivityIcon className="size-[15px]" />}
             onClick={() => router.push(`/projects/${project.id}/runs`)}
           />
-          <Link
-            label="Scripts"
-            desc="Generated, runnable without LLM"
-            icon={<CodeIcon className="size-[15px]" />}
-            onClick={() => router.push(`/projects/${project.id}/scripts`)}
+          <NavCard
+            label="Settings"
+            desc="Project metadata and defaults"
+            icon={<Settings2Icon className="size-[15px]" />}
+            onClick={() => router.push(`/projects/${project.id}/settings`)}
           />
         </div>
       </div>
@@ -189,7 +206,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   )
 }
 
-function Link({
+function NavCard({
   label,
   desc,
   icon,

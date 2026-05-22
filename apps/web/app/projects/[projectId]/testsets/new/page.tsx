@@ -1,19 +1,21 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
-import { notFound } from "next/navigation"
 import { BoltIcon, ChevronLeftIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { CapLine } from "@/components/probe/cap-line"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { getProject } from "@/lib/mock/projects"
+import {
+  createTestScenario,
+  getProject,
+  useFetch,
+  useMutation,
+} from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
-import { cn } from "@/lib/utils"
 
 export default function NewTestsetPage({
   params,
@@ -22,23 +24,80 @@ export default function NewTestsetPage({
 }) {
   const { projectId } = use(params)
   const router = useRouter()
-  const project = getProject(projectId)
+  const projectQ = useFetch(
+    useCallback(() => getProject(projectId), [projectId]),
+    [projectId],
+  )
 
   useSetBreadcrumbs(
-    project
+    projectQ.data
       ? [
           { label: "Projects", href: "/projects" },
-          { label: project.name, href: `/projects/${project.id}` },
-          { label: "Test sets", href: `/projects/${project.id}/testsets` },
+          {
+            label: projectQ.data.name,
+            href: `/projects/${projectQ.data.id}`,
+          },
+          { label: "Test sets", href: `/projects/${projectQ.data.id}/testsets` },
           { label: "New brief" },
         ]
       : [{ label: "Projects", href: "/projects" }],
   )
 
-  const [name, setName] = useState("Saved Carts — Cross-Device Persistence")
-  const [sandbox, setSandbox] = useState<"e2b" | "cu">("e2b")
+  const [title, setTitle] = useState("")
+  const [featureDescription, setFeatureDescription] = useState("")
+  const [userStory, setUserStory] = useState("")
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState("")
 
-  if (!project) notFound()
+  const createMut = useMutation(
+    useCallback(async () => {
+      const scenario = await createTestScenario(projectId, {
+        title,
+        feature_description: featureDescription,
+        user_story: userStory,
+        acceptance_criteria: acceptanceCriteria,
+      })
+      return scenario
+    }, [projectId, title, featureDescription, userStory, acceptanceCriteria]),
+  )
+
+  const project = projectQ.data
+  if (projectQ.error) {
+    return (
+      <div className="px-6 py-10 text-center">
+        <h1 className="text-[20px] font-semibold">Project not found</h1>
+        <p className="text-ink-3 mt-1 text-[13px]">{projectQ.error.message}</p>
+      </div>
+    )
+  }
+  if (!project) {
+    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+  }
+
+  const submit = async () => {
+    if (!title.trim()) {
+      toast.error("Title is required")
+      return
+    }
+    if (!featureDescription.trim()) {
+      toast.error("Feature description is required")
+      return
+    }
+    if (!userStory.trim()) {
+      toast.error("User story is required")
+      return
+    }
+    if (!acceptanceCriteria.trim()) {
+      toast.error("Acceptance criteria are required")
+      return
+    }
+    try {
+      const scenario = await createMut.run()
+      toast.success("Test set created")
+      router.push(`/projects/${projectId}/testsets/${scenario.id}`)
+    } catch (e) {
+      toast.error(`Failed to create: ${e instanceof Error ? e.message : e}`)
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[820px] px-6 py-8">
@@ -60,99 +119,61 @@ export default function NewTestsetPage({
         New test set
       </h1>
       <p className="text-ink-3 mt-1 mb-5 text-[13.5px]">
-        Write this like a PM brief — what&apos;s being tested, what&apos;s out
-        of scope, success criteria. Agent 1 will turn it into a versioned
-        FeatureExpectation.
+        Write this like a PM brief — what&apos;s being tested, the user
+        story, and the acceptance criteria. Agent 1 will turn it into a
+        versioned FeatureExpectation.
       </p>
 
       <div className="border-border bg-card space-y-4 rounded-lg border p-6">
         <Field label="Title">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Input
+            value={title}
+            placeholder="e.g. Saved Carts — Cross-Device Persistence"
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </Field>
 
         <Field
-          label="What's being tested"
+          label="Feature description"
           help="A few sentences of context — what the feature does and why it exists."
         >
           <Textarea
             rows={4}
-            defaultValue="Authenticated shoppers can save their cart and resume it on any device. Anonymous carts merge non-destructively at sign-in. Stale carts (>30d) are pruned with a one-time recovery window."
+            value={featureDescription}
+            onChange={(e) => setFeatureDescription(e.target.value)}
+            placeholder="Describe the feature, the affected surfaces, and any in-/out-of-scope notes."
           />
         </Field>
 
-        <Field label="Explicitly out of scope">
+        <Field label="User story">
           <Textarea
-            rows={2}
-            defaultValue="Checkout completion (covered by a separate test set). Inventory reconciliation. Email notifications."
+            rows={3}
+            value={userStory}
+            onChange={(e) => setUserStory(e.target.value)}
+            placeholder="As a … I want … so that …"
           />
         </Field>
 
-        <Field label="Success criteria (free-form — Agent 1 will tighten)">
+        <Field label="Acceptance criteria">
           <Textarea
-            rows={4}
-            defaultValue="Cart restores within 2s on a fresh device. Anon→auth merge is non-destructive. Carts older than 30d are unreachable except via the recovery flow. Save endpoint is idempotent within 24h."
+            rows={5}
+            value={acceptanceCriteria}
+            onChange={(e) => setAcceptanceCriteria(e.target.value)}
+            placeholder="- The endpoint returns 200…\n- Latency is under …"
           />
-        </Field>
-
-        <Field
-          label="References (optional)"
-          help="Repo paths, design docs, Figma URLs — anything the agents should read."
-        >
-          <Input defaultValue="github.com/example-org/shop/blob/main/api/v2/cart.py, web/src/CartPage.tsx" />
-        </Field>
-
-        <div className="pt-2">
-          <CapLine className="mb-2">orchestration</CapLine>
-        </div>
-
-        <Field label="Sandbox mode">
-          <div className="border-border bg-card inline-flex overflow-hidden rounded-md border">
-            <button
-              type="button"
-              onClick={() => setSandbox("e2b")}
-              className={cn(
-                "px-3 py-1.5 text-[12.5px] font-medium",
-                sandbox === "e2b"
-                  ? "bg-foreground text-background"
-                  : "text-ink-2 hover:bg-muted"
-              )}
-            >
-              E2B · headless
-            </button>
-            <button
-              type="button"
-              onClick={() => setSandbox("cu")}
-              className={cn(
-                "border-border border-l px-3 py-1.5 text-[12.5px] font-medium",
-                sandbox === "cu"
-                  ? "bg-foreground text-background"
-                  : "text-ink-2 hover:bg-muted"
-              )}
-            >
-              Computer Use · noVNC
-            </button>
-          </div>
-          <div className="text-ink-4 mt-2 text-[11.5px]">
-            E2B is cheaper and faster. Switch to Computer Use only for
-            pixel-level UI exploration.
-          </div>
         </Field>
       </div>
 
       <div className="mt-4 flex justify-end gap-2">
-        <Button variant="ghost">Save as draft</Button>
         <Button
-          variant="accent"
-          onClick={() => {
-            toast.success("Run kicked off — opening timeline")
-            setTimeout(
-              () => router.push(`/projects/${project.id}/runs/run_018f2c`),
-              500
-            )
-          }}
+          variant="ghost"
+          onClick={() => router.push(`/projects/${project.id}/testsets`)}
         >
+          Cancel
+        </Button>
+        <Button variant="accent" onClick={submit} disabled={createMut.loading}>
           <BoltIcon className="size-[13px]" />
-          Kick off run
+          {createMut.loading ? "Creating…" : "Create test set"}
         </Button>
       </div>
     </div>

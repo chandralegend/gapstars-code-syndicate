@@ -1,9 +1,8 @@
 "use client"
 
-import { use } from "react"
+import { use, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { notFound } from "next/navigation"
-import { ChevronRightIcon, DownloadIcon, FilterIcon } from "lucide-react"
+import { ChevronRightIcon } from "lucide-react"
 
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
@@ -18,14 +17,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getProject } from "@/lib/mock/projects"
-import { RECENT_RUNS } from "@/lib/mock/recent-runs"
+import { getProject, listRunsByProject, useFetch } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 
-const STATUS_MAP = {
-  running: { kind: "running" as const, label: "running" },
-  done: { kind: "done" as const, label: "done" },
-  err: { kind: "err" as const, label: "error" },
+const RUN_STATUS_DOT: Record<
+  string,
+  { kind: "running" | "done" | "err" | "wait"; label: string }
+> = {
+  pending: { kind: "wait", label: "pending" },
+  agent1_running: { kind: "running", label: "agent 1 running" },
+  agent1_review: { kind: "wait", label: "awaiting review" },
+  agent2_running: { kind: "running", label: "agent 2 running" },
+  agent3_running: { kind: "running", label: "agent 3 running" },
+  agent3_review: { kind: "wait", label: "awaiting review" },
+  completed: { kind: "done", label: "completed" },
+  failed: { kind: "err", label: "failed" },
 }
 
 export default function ProjectRunsPage({
@@ -35,7 +41,17 @@ export default function ProjectRunsPage({
 }) {
   const { projectId } = use(params)
   const router = useRouter()
-  const project = getProject(projectId)
+
+  const projectQ = useFetch(
+    useCallback(() => getProject(projectId), [projectId]),
+    [projectId],
+  )
+  const runsQ = useFetch(
+    useCallback(() => listRunsByProject(projectId), [projectId]),
+    [projectId],
+  )
+  const project = projectQ.data
+  const runs = runsQ.data ?? []
 
   useSetBreadcrumbs(
     project
@@ -47,49 +63,40 @@ export default function ProjectRunsPage({
       : [{ label: "Projects", href: "/projects" }],
   )
 
-  if (!project) notFound()
+  if (projectQ.error) {
+    return (
+      <div className="px-6 py-10 text-center">
+        <h1 className="text-[20px] font-semibold">Project not found</h1>
+        <p className="text-ink-3 mt-1 text-[13px]">{projectQ.error.message}</p>
+      </div>
+    )
+  }
+  if (!project) {
+    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+  }
 
-  const runs = project.id === "shop" ? RECENT_RUNS : []
+  const active = runs.filter(
+    (r) => !["completed", "failed"].includes(r.status),
+  ).length
 
   return (
     <>
-      <PageHead
-        title="Runs"
-        sub={`${project.runsThisWeek} runs this week · across all test sets in ${project.name}`}
-        actions={
-          <>
-            <Button variant="ghost" size="sm">
-              <FilterIcon className="size-[13px]" />
-              Filter
-            </Button>
-            <Button variant="ghost" size="sm">
-              <DownloadIcon className="size-[13px]" />
-              Export CSV
-            </Button>
-          </>
-        }
-      />
+      <PageHead title="Runs" sub={`Across all test sets in ${project.name}`} />
 
       <div className="max-w-[1200px] px-6 py-6">
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <StatCard label="Active runs" value={String(active)} />
+          <StatCard label="Total runs" value={String(runs.length)} />
           <StatCard
-            label="Active runs"
-            value="1"
-            delta="run_018f2c · 2m elapsed"
+            label="Failed"
+            value={String(runs.filter((r) => r.status === "failed").length)}
           />
-          <StatCard
-            label="Runs this week"
-            value={String(project.runsThisWeek)}
-            delta="+8 vs last week"
-            deltaKind={project.runsThisWeek > 0 ? "up" : undefined}
-          />
-          <StatCard label="Avg duration" value="3m 41s" delta="P95 6m 12s" />
         </div>
 
         <div className="mb-3">
           <CapLine>recent runs</CapLine>
           <div className="text-ink-3 mt-0.5 text-[12px]">
-            live updates via SSE — every checkpoint streams here
+            click a run to open its live timeline
           </div>
         </div>
 
@@ -103,37 +110,42 @@ export default function ProjectRunsPage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Run</TableHead>
-                  <TableHead>Test set</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Cases</TableHead>
+                  <TableHead>Node</TableHead>
+                  <TableHead>Started</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {runs.map((r) => {
-                  const s = STATUS_MAP[r.status]
+                  const meta =
+                    RUN_STATUS_DOT[r.status] ?? {
+                      kind: "wait" as const,
+                      label: r.status,
+                    }
                   return (
                     <TableRow
                       key={r.id}
                       className="cursor-pointer"
                       onClick={() =>
-                        r.status === "running" &&
                         router.push(`/projects/${project.id}/runs/${r.id}`)
                       }
                     >
                       <TableCell className="font-mono text-[12px]">
-                        {r.id}
+                        {r.id.slice(0, 8)}
                       </TableCell>
-                      <TableCell>{r.test}</TableCell>
                       <TableCell>
                         <span className="flex items-center gap-2 text-[12.5px]">
-                          <StatusDot kind={s.kind} />
-                          {s.label}
+                          <StatusDot kind={meta.kind} />
+                          {meta.label}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono">{r.duration}</TableCell>
-                      <TableCell className="font-mono">{r.cases}</TableCell>
+                      <TableCell className="text-ink-3 font-mono text-[12px]">
+                        {r.current_node ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-ink-3">
+                        {new Date(r.created_at).toLocaleString()}
+                      </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm">
                           Open
