@@ -6,6 +6,7 @@
  */
 import {
   apiClient,
+  API_URL,
   type FeatureExpectation,
   type FeedbackRequest,
   type Project,
@@ -13,6 +14,7 @@ import {
   type ProjectUpdate,
   type Run,
   type RunCreateResponse,
+  type SandboxFileList,
   type TestCase,
   type TestScenario,
   type TestScenarioCreate,
@@ -185,4 +187,37 @@ export async function getTestCases(runId: string): Promise<TestCase[]> {
       params: { path: { run_id: runId } },
     }),
   )
+}
+
+// ── Sandbox artifacts ───────────────────────────────────────────────────────
+
+export async function listSandboxFiles(
+  runId: string,
+): Promise<SandboxFileList> {
+  return unwrap(
+    await apiClient.GET("/api/runs/{run_id}/sandbox/files", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function readSandboxFile(
+  runId: string,
+  filePath: string,
+): Promise<string> {
+  // openapi-fetch returns the parsed body; for text/plain that's the string
+  // already. We bypass the typed endpoint here since it's modeled as `unknown`
+  // by openapi-typescript for path-templated text responses, and use plain fetch
+  // through the same base URL so the file path can contain slashes.
+  const url = `${API_URL}/api/runs/${runId}/sandbox/files/${filePath
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(
+      `${res.status} ${res.statusText} reading ${filePath}: ${await res.text()}`,
+    )
+  }
+  return await res.text()
 }

@@ -277,6 +277,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/sandbox/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sandbox Files */
+        get: operations["list_sandbox_files_api_runs__run_id__sandbox_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/sandbox/files/{file_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sandbox File */
+        get: operations["get_sandbox_file_api_runs__run_id__sandbox_files__file_path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -519,6 +553,20 @@ export interface components {
          * @enum {string}
          */
         RunStatus: "pending" | "agent1_running" | "agent1_review" | "agent2_running" | "agent3_running" | "agent3_review" | "completed" | "failed";
+        /** SandboxFile */
+        SandboxFile: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+        };
+        /** SandboxFileList */
+        SandboxFileList: {
+            /** Task Id */
+            task_id: string;
+            /** Files */
+            files: components["schemas"]["SandboxFile"][];
+        };
         /**
          * TestCaseCategory
          * @enum {string}
@@ -1284,6 +1332,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestCaseRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sandbox_files_api_runs__run_id__sandbox_files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxFileList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sandbox_file_api_runs__run_id__sandbox_files__file_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                file_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

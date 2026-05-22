@@ -17,6 +17,21 @@ import {
 } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 
+const FEATURE_DESCRIPTION_PLACEHOLDER = `Describe the feature, the surfaces it affects, and any in- or out-of-scope notes.
+
+Example: "Authenticated shoppers can save a cart and resume it on any device. Out of scope: anonymous carts older than 30 days."`
+
+const USER_STORY_PLACEHOLDER = `As a … I want … so that …
+
+Example: "As a returning shopper I want my cart to follow me across devices so I don't lose items I picked out earlier."`
+
+const ACCEPTANCE_CRITERIA_PLACEHOLDER = `One bullet per criterion.
+
+Example:
+- The endpoint returns 200 and content-type application/json.
+- The response body is exactly {"status":"ok"}.
+- Latency is under 1 second under normal load.`
+
 export default function NewTestsetPage({
   params,
 }: {
@@ -37,8 +52,8 @@ export default function NewTestsetPage({
             label: projectQ.data.name,
             href: `/projects/${projectQ.data.id}`,
           },
-          { label: "Test sets", href: `/projects/${projectQ.data.id}/testsets` },
-          { label: "New brief" },
+          { label: "Feature tests", href: `/projects/${projectQ.data.id}/testsets` },
+          { label: "New feature test" },
         ]
       : [{ label: "Projects", href: "/projects" }],
   )
@@ -92,7 +107,7 @@ export default function NewTestsetPage({
     }
     try {
       const scenario = await createMut.run()
-      toast.success("Test set created")
+      toast.success("Feature test created")
       router.push(`/projects/${projectId}/testsets/${scenario.id}`)
     } catch (e) {
       toast.error(`Failed to create: ${e instanceof Error ? e.message : e}`)
@@ -108,7 +123,7 @@ export default function NewTestsetPage({
           onClick={() => router.push(`/projects/${project.id}/testsets`)}
         >
           <ChevronLeftIcon className="size-[13px]" />
-          Back to test sets
+          Back to feature tests
         </Button>
       </div>
 
@@ -116,12 +131,12 @@ export default function NewTestsetPage({
         className="font-serif text-[34px] leading-tight tracking-[-0.015em]"
         style={{ fontFamily: "var(--font-serif), serif" }}
       >
-        New test set
+        New feature test
       </h1>
       <p className="text-ink-3 mt-1 mb-5 text-[13.5px]">
         Write this like a PM brief — what&apos;s being tested, the user
-        story, and the acceptance criteria. Agent 1 will turn it into a
-        versioned FeatureExpectation.
+        story, and what needs to be true to pass. The orchestrator will turn
+        it into a versioned brief and explore the feature in a sandbox.
       </p>
 
       <div className="border-border bg-card space-y-4 rounded-lg border p-6">
@@ -138,28 +153,31 @@ export default function NewTestsetPage({
           help="A few sentences of context — what the feature does and why it exists."
         >
           <Textarea
-            rows={4}
+            rows={5}
             value={featureDescription}
             onChange={(e) => setFeatureDescription(e.target.value)}
-            placeholder="Describe the feature, the affected surfaces, and any in-/out-of-scope notes."
+            placeholder={FEATURE_DESCRIPTION_PLACEHOLDER}
           />
         </Field>
 
         <Field label="User story">
           <Textarea
-            rows={3}
+            rows={4}
             value={userStory}
             onChange={(e) => setUserStory(e.target.value)}
-            placeholder="As a … I want … so that …"
+            placeholder={USER_STORY_PLACEHOLDER}
           />
         </Field>
 
-        <Field label="Acceptance criteria">
+        <Field
+          label="What needs to be true to pass"
+          help="One concrete, observable criterion per bullet."
+        >
           <Textarea
-            rows={5}
+            rows={7}
             value={acceptanceCriteria}
             onChange={(e) => setAcceptanceCriteria(e.target.value)}
-            placeholder="- The endpoint returns 200…\n- Latency is under …"
+            placeholder={ACCEPTANCE_CRITERIA_PLACEHOLDER}
           />
         </Field>
       </div>
@@ -173,7 +191,7 @@ export default function NewTestsetPage({
         </Button>
         <Button variant="accent" onClick={submit} disabled={createMut.loading}>
           <BoltIcon className="size-[13px]" />
-          {createMut.loading ? "Creating…" : "Create test set"}
+          {createMut.loading ? "Creating…" : "Create feature test"}
         </Button>
       </div>
     </div>

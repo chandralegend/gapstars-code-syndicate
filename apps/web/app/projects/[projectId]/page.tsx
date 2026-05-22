@@ -20,6 +20,7 @@ import {
   listTestScenarios,
   useFetch,
 } from "@/lib/api"
+import { RelativeTime } from "@/lib/format"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 
 export default function ProjectOverviewPage({
@@ -90,7 +91,7 @@ export default function ProjectOverviewPage({
               onClick={() => router.push(`/projects/${project.id}/testsets/new`)}
             >
               <PlusIcon className="size-[13px]" />
-              New test set
+              New feature test
             </Button>
           </>
         }
@@ -99,7 +100,7 @@ export default function ProjectOverviewPage({
       <div className="max-w-[1200px] px-6 py-6">
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           <StatCard
-            label="Test sets"
+            label="Feature tests"
             value={String(scenarios.length)}
             delta={
               scenarios.length === 0 ? "Create your first one" : "+ in this project"
@@ -122,9 +123,9 @@ export default function ProjectOverviewPage({
           <>
             <div className="mb-3 flex items-end justify-between">
               <div>
-                <CapLine>recent test sets</CapLine>
+                <CapLine>recent feature tests</CapLine>
                 <div className="text-ink-3 mt-0.5 text-[12px]">
-                  click a test set to open its cases, scripts, and runs
+                  click a feature test to view its brief and runs
                 </div>
               </div>
               <Button
@@ -159,8 +160,11 @@ export default function ProjectOverviewPage({
                   <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
                     {t.feature_description}
                   </div>
-                  <div className="text-ink-4 mt-3 flex items-center gap-2 font-mono text-[11px]">
+                  <div className="text-ink-4 mt-3 flex items-center gap-2 text-[11px]">
                     <span>{t.status}</span>
+                    <span className="ml-auto">
+                      <RelativeTime iso={t.created_at} />
+                    </span>
                   </div>
                 </button>
               ))}
@@ -193,14 +197,14 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
         <FlaskConicalIcon className="size-[20px]" />
       </div>
-      <div className="mt-3 text-[16px] font-medium">No test sets yet</div>
+      <div className="mt-3 text-[16px] font-medium">No feature tests yet</div>
       <div className="text-ink-3 mt-1 max-w-[420px] text-center text-[13px]">
-        A test set bundles a feature&apos;s expectation, generated cases, and
-        the scripts that exercise them. Start by writing a brief.
+        A feature test bundles a feature&apos;s brief, the agent&apos;s findings,
+        and the test cases that follow. Start by writing a short brief.
       </div>
       <Button variant="accent" className="mt-5" onClick={onCreate}>
         <PlusIcon className="size-[13px]" />
-        Create your first test set
+        Create your first feature test
       </Button>
     </div>
   )

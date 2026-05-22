@@ -8,6 +8,7 @@ import { CapLine } from "@/components/probe/cap-line"
 import { Kbd } from "@/components/probe/kbd"
 import { PageHead } from "@/components/probe/page-head"
 import { StatCard } from "@/components/probe/stat-card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -19,7 +20,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getProject, listTestScenarios, useFetch } from "@/lib/api"
+import { RelativeTime } from "@/lib/format"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
+
+const SCENARIO_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  in_progress: "In progress",
+  completed: "Completed",
+}
 
 export default function TestsetsListPage({
   params,
@@ -46,7 +54,7 @@ export default function TestsetsListPage({
       ? [
           { label: "Projects", href: "/projects" },
           { label: project.name, href: `/projects/${project.id}` },
-          { label: "Test sets" },
+          { label: "Feature tests" },
         ]
       : [{ label: "Projects", href: "/projects" }],
   )
@@ -66,14 +74,14 @@ export default function TestsetsListPage({
   return (
     <>
       <PageHead
-        title="Test sets"
-        sub={`${scenarios.length} test set${scenarios.length === 1 ? "" : "s"} in ${project.name}`}
+        title="Feature tests"
+        sub={`${scenarios.length} feature test${scenarios.length === 1 ? "" : "s"} in ${project.name}`}
         actions={
           <>
             <div className="border-border bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
               <SearchIcon className="text-ink-4 size-[13px]" />
               <Input
-                placeholder="Search test sets…"
+                placeholder="Search feature tests…"
                 className="h-7 w-[180px] border-0 bg-transparent px-1 text-[13px] shadow-none focus-visible:ring-0"
               />
               <Kbd>⌘K</Kbd>
@@ -89,7 +97,7 @@ export default function TestsetsListPage({
               }
             >
               <PlusIcon className="size-[13px]" />
-              New test set
+              New feature test
             </Button>
           </>
         }
@@ -97,7 +105,7 @@ export default function TestsetsListPage({
 
       <div className="max-w-[1200px] px-6 py-6">
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <StatCard label="Test sets" value={String(scenarios.length)} />
+          <StatCard label="Feature tests" value={String(scenarios.length)} />
           <StatCard
             label="Drafts"
             value={String(scenarios.filter((s) => s.status === "draft").length)}
@@ -106,16 +114,16 @@ export default function TestsetsListPage({
 
         <div className="mb-3 flex items-end justify-between">
           <div>
-            <CapLine>all test sets</CapLine>
+            <CapLine>all feature tests</CapLine>
             <div className="text-ink-3 mt-0.5 text-[12px]">
-              click a test set to open its cases, scripts, and runs
+              click a feature test to view its brief and runs
             </div>
           </div>
         </div>
 
         {scenarios.length === 0 ? (
           <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
-            <div className="text-[15px] font-medium">No test sets yet</div>
+            <div className="text-[15px] font-medium">No feature tests yet</div>
             <div className="text-ink-3 mt-1 text-[13px]">
               Start by writing a brief for the feature you want to validate.
             </div>
@@ -127,7 +135,7 @@ export default function TestsetsListPage({
               }
             >
               <PlusIcon className="size-[13px]" />
-              Create your first test set
+              Create your first feature test
             </Button>
           </div>
         ) : (
@@ -135,7 +143,7 @@ export default function TestsetsListPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[55%]">Test set</TableHead>
+                  <TableHead className="w-[55%]">Feature test</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead></TableHead>
@@ -157,10 +165,12 @@ export default function TestsetsListPage({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-[12px]">{t.status}</span>
+                      <Badge variant="muted">
+                        {SCENARIO_STATUS_LABEL[t.status] ?? t.status}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-ink-3 text-[12.5px]">
-                      {new Date(t.created_at).toLocaleString()}
+                      <RelativeTime iso={t.created_at} />
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm">

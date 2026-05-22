@@ -18,7 +18,7 @@ import { createProject, useMutation } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 import { cn } from "@/lib/utils"
 
-const STEPS = ["Project", "Problem", "Audience & stack", "Notes", "Review"]
+const STEPS = ["Project", "Problem", "Context", "Anything else?", "Review"]
 
 export default function OnboardPage() {
   useSetBreadcrumbs([
