@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 
@@ -264,3 +264,29 @@ def get_artifact(task_id: str, name: str) -> FileResponse:
     if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="artifact not found")
     return FileResponse(target)
+
+
+@router.get("/tasks/{task_id}/zip")
+def download_workspace_zip(task_id: str) -> Response:
+    """Stream a zip of everything the agent wrote under ``output/workspace/``.
+
+    Used by the orchestrator's script-bundle download endpoint. Returns
+    404 if the task or its workspace dir is missing.
+    """
+    with session_scope() as db:
+        if db.get(Task, task_id) is None:
+            raise HTTPException(status_code=404, detail="task not found")
+
+    blob = storage.build_workspace_zip(task_id)
+    if blob is None:
+        raise HTTPException(status_code=404, detail="workspace not found")
+
+    filename = f"workspace-{task_id[:8]}.zip"
+    return Response(
+        content=blob,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, max-age=30",
+        },
+    )

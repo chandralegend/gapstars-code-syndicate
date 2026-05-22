@@ -7,6 +7,7 @@
 import {
   apiClient,
   API_URL,
+  type BundleFileList,
   type ExtendResponse,
   type FeatureExpectation,
   type FeedbackRequest,
@@ -22,6 +23,7 @@ import {
   type TestScenario,
   type TestScenarioCreate,
   type TestScenarioUpdate,
+  type TestScriptBundle,
 } from "./client"
 
 function unwrap<T>(envelope: { data?: T; error?: unknown }): T {
@@ -263,4 +265,80 @@ export async function extendSandboxTimeout(
       body: { extra_seconds: extraSeconds },
     }),
   )
+}
+
+// ── Test-script bundles (Agent 4) ───────────────────────────────────────────
+
+export async function generateTestScripts(
+  runId: string,
+): Promise<TestScriptBundle> {
+  return unwrap(
+    await apiClient.POST("/api/runs/{run_id}/scripts", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function getLatestScriptBundle(
+  runId: string,
+): Promise<TestScriptBundle | null> {
+  const res = await apiClient.GET("/api/runs/{run_id}/scripts/latest", {
+    params: { path: { run_id: runId } },
+  })
+  if (res.error) {
+    // Treat 404 as "no bundle yet" so callers can render an empty state
+    // without an error toast.
+    const status =
+      typeof res.error === "object" && res.error
+        ? (res.error as { status?: number }).status
+        : undefined
+    if (status === 404) return null
+    throw res.error instanceof Error
+      ? res.error
+      : new Error(JSON.stringify(res.error))
+  }
+  return res.data ?? null
+}
+
+export async function listScriptBundles(
+  runId: string,
+): Promise<TestScriptBundle[]> {
+  return unwrap(
+    await apiClient.GET("/api/runs/{run_id}/scripts", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function listScriptBundleFiles(
+  runId: string,
+): Promise<BundleFileList> {
+  return unwrap(
+    await apiClient.GET("/api/runs/{run_id}/scripts/latest/files", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function readScriptBundleFile(
+  runId: string,
+  filePath: string,
+): Promise<string> {
+  // Strip the workspace prefix the API automatically prepends.
+  const stripped = filePath.replace(/^output\/workspace\//, "")
+  const url = `${API_URL}/api/runs/${runId}/scripts/latest/files/${stripped
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(
+      `${res.status} ${res.statusText} reading ${filePath}: ${await res.text()}`,
+    )
+  }
+  return await res.text()
+}
+
+export function scriptBundleDownloadUrl(runId: string): string {
+  return `${API_URL}/api/runs/${runId}/scripts/latest/download`
 }

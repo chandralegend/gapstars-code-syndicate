@@ -5,6 +5,7 @@ from api.services import (
     run_service,
     test_case_service,
     test_scenario_service,
+    test_script_bundle_service,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "run_service",
     "test_case_service",
     "test_scenario_service",
+    "test_script_bundle_service",
 ]

@@ -215,6 +215,32 @@ class SandboxClient:
         content_type = response.headers.get("content-type", "application/octet-stream")
         return response.content, content_type
 
+    async def download_workspace_zip(self, task_id: str) -> tuple[bytes, str] | None:
+        """Pull a zip of ``output/workspace/`` produced by a sandbox task.
+
+        Returns ``(bytes, filename)`` or ``None`` if the task or its
+        workspace dir is missing.
+        """
+        try:
+            response = await self._client.get(f"/tasks/{task_id}/zip")
+        except httpx.HTTPError as exc:
+            raise SandboxError(f"sandbox zip {task_id}: {exc}") from exc
+        if response.status_code == 404:
+            return None
+        if response.status_code >= 400:
+            raise SandboxError(
+                f"sandbox zip {task_id}: {response.status_code} {response.text}"
+            )
+        # Pull a sensible filename from Content-Disposition if present.
+        cd = response.headers.get("content-disposition", "")
+        filename = f"workspace-{task_id[:8]}.zip"
+        if "filename=" in cd:
+            try:
+                filename = cd.split("filename=", 1)[1].strip().strip('"')
+            except Exception:
+                pass
+        return response.content, filename
+
 
 class SandboxError(RuntimeError):
     """Raised when the sandbox HTTP API returns an error or behaves unexpectedly."""

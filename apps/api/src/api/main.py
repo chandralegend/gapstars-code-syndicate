@@ -19,6 +19,7 @@ from api.routers import (
     runs_router,
     sandbox_artifacts_router,
     test_scenarios_router,
+    test_scripts_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(test_scenarios_router)
     app.include_router(runs_router)
     app.include_router(sandbox_artifacts_router)
+    app.include_router(test_scripts_router)
 
     # ── Health ────────────────────────────────────────────────────────────────
     @app.get("/api/health", tags=["health"])
