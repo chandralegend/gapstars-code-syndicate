@@ -1,5 +1,7 @@
 Let me sketch the agent graph first so the phase breakdown lines up with it.A few notes on the graph itself before the phases:
 
+![alt text](image.png)
+
 The whole thing is one LangGraph state graph with a single shared `State` TypedDict (project_id, test_id, feature_spec, workspace_outputs, test_cases, human_decision, logs, etc.). The two "Human review" nodes are `interrupt()` calls — LangGraph pauses the graph mid-run, the frontend renders whatever is in state, the user accepts or edits, and the graph resumes from the same checkpoint. This is important because it means you don't have to invent your own state machine for the HITL loops — `PostgresSaver` handles persistence and resume natively. Agent 2 doesn't *do* the feature understanding itself; it provisions a workspace and waits for a completion signal (poll or pubsub). Script generation is a separate sub-graph triggered explicitly by the user, not part of the main run.
 
 ## Phase 1 — Agents (LangGraph backend)
