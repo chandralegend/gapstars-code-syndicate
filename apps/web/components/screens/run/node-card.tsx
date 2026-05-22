@@ -1,6 +1,6 @@
 "use client"
 
-import { ClockIcon, CpuIcon, DollarSignIcon, EyeIcon, CheckIcon } from "lucide-react"
+import { ClockIcon, EyeIcon, CheckIcon } from "lucide-react"
 
 import { StatusDot } from "@/components/probe/status-dot"
 import { Badge } from "@/components/ui/badge"
@@ -62,26 +62,12 @@ export function NodeCard({
         </div>
         <div className="text-[13.5px] font-medium">{node.name}</div>
         <div className="text-ink-3 mt-0.5 text-[12px]">{node.desc}</div>
-        {(node.elapsed || node.tokens || node.cost) && (
+        {node.elapsed && (
           <div className="text-ink-4 mt-2 flex items-center gap-3 font-mono text-[11px]">
-            {node.elapsed && (
-              <span className="flex items-center gap-1">
-                <ClockIcon className="size-[11px]" />
-                {node.elapsed}
-              </span>
-            )}
-            {node.tokens && (
-              <span className="flex items-center gap-1">
-                <CpuIcon className="size-[11px]" />
-                {node.tokens} tok
-              </span>
-            )}
-            {node.cost && (
-              <span className="flex items-center gap-1">
-                <DollarSignIcon className="size-[11px]" />
-                {node.cost}
-              </span>
-            )}
+            <span className="flex items-center gap-1">
+              <ClockIcon className="size-[11px]" />
+              {node.elapsed}
+            </span>
           </div>
         )}
         {node.status === "running" && (
@@ -139,7 +125,7 @@ export function GateCard({
           <div className="text-[13px] font-medium">{node.name}</div>
           <div className="text-ink-3 text-[11px]">
             {done
-              ? `Accepted by ${node.approver} · ${node.when}`
+              ? `Accepted${node.when ? ` · ${node.when}` : ""}`
               : "Awaiting human review"}
           </div>
         </div>

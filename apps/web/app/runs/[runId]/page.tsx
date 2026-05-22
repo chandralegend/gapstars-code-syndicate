@@ -20,7 +20,6 @@ export default function RunPage({
 
   useSetBreadcrumbs(
     [
-      { label: "acme/shop", muted: true },
       { label: "Tests", href: "/tests" },
       { label: "Saved Carts", muted: true, href: "/tests" },
       { label: runId, mono: true },

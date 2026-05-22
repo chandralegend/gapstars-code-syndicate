@@ -6,7 +6,6 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  LockIcon,
   PlusIcon,
   SparklesIcon,
   Trash2Icon,
@@ -20,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 import { cn } from "@/lib/utils"
 
-const STEPS = ["Context", "Personas", "Endpoints & creds", "Rules", "Review"]
+const STEPS = ["Context", "Personas", "Endpoints", "Rules", "Review"]
 
 interface Persona {
   name: string
@@ -29,10 +28,7 @@ interface Persona {
 }
 
 export default function OnboardPage() {
-  useSetBreadcrumbs([
-    { label: "Setup", muted: true },
-    { label: "New project" },
-  ])
+  useSetBreadcrumbs([{ label: "New project" }])
   const router = useRouter()
 
   const [step, setStep] = useState(0)
@@ -41,7 +37,7 @@ export default function OnboardPage() {
     { name: "Anonymous shopper", role: "visitor", notes: "No account; localStorage cart" },
   ])
   const [rules, setRules] = useState(
-    "• Always run against staging.acme.shop\n• Never POST to /api/checkout/* in tests\n• Use the seed user `qa+saved@acme.shop`"
+    "• Always run against staging\n• Never POST to /api/checkout/* in tests\n• Use the seed user account for authenticated flows"
   )
 
   return (
@@ -91,7 +87,7 @@ export default function OnboardPage() {
         <p className="text-ink-3 mt-1 mb-5 text-[13px]">
           {step === 0 && "Probe uses this context across every test in this project. You can edit it later."}
           {step === 1 && "Add up to 6 personas. Agents adopt these roles when exploring."}
-          {step === 2 && "URLs the agents are allowed to hit, plus any read-only credentials."}
+          {step === 2 && "URLs the agents are allowed to hit."}
           {step === 3 && "Free-form constraints. The agents see these in their system prompt."}
           {step === 4 && "Everything below will be the project's starting context. Ship it."}
         </p>
@@ -99,7 +95,7 @@ export default function OnboardPage() {
         {step === 0 && (
           <div className="space-y-4">
             <Field label="Project name">
-              <Input defaultValue="acme/shop" />
+              <Input defaultValue="Probe" />
             </Field>
             <Field label="One-line description">
               <Input defaultValue="A direct-to-consumer marketplace for outdoor gear. Web + iOS." />
@@ -171,20 +167,13 @@ export default function OnboardPage() {
         {step === 2 && (
           <div className="space-y-4">
             <Field label="Staging base URL">
-              <Input defaultValue="https://staging.acme.shop" />
+              <Input defaultValue="https://staging.example.com" />
             </Field>
             <Field label="API base URL">
-              <Input defaultValue="https://api.staging.acme.shop" />
-            </Field>
-            <Field
-              label="Read-only credentials"
-              help="Stored encrypted; never sent to the LLM in plaintext."
-            >
-              <Input defaultValue="qa+saved@acme.shop" />
-              <Input type="password" defaultValue="••••••••••••••••" className="mt-2" />
+              <Input defaultValue="https://api.staging.example.com" />
             </Field>
             <Field label="Repo (optional, for reference reading)">
-              <Input defaultValue="github.com/acme-corp/shop" />
+              <Input defaultValue="github.com/example-org/example" />
             </Field>
           </div>
         )}
@@ -195,10 +184,6 @@ export default function OnboardPage() {
             help="Markdown. Each line becomes a rule the agents must respect."
           >
             <Textarea rows={9} value={rules} onChange={(e) => setRules(e.target.value)} />
-            <div className="text-ink-4 mt-2 flex items-center gap-1.5 font-mono text-[11.5px]">
-              <LockIcon className="size-[11px]" />
-              credentials are stripped before being passed to Claude
-            </div>
           </Field>
         )}
 
@@ -219,7 +204,7 @@ export default function OnboardPage() {
                 </code>
               </li>
               <li>Read repo references for shared vocabulary</li>
-              <li>Provision a workspace image with playwright + httpx + the seed user</li>
+              <li>Provision a workspace image with playwright + httpx</li>
               <li>Set up SSE channel for the run timeline</li>
             </ul>
           </div>

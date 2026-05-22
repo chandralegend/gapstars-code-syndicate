@@ -1,7 +1,6 @@
 "use client"
 
 import { CapLine } from "@/components/probe/cap-line"
-import { CostBar } from "@/components/screens/run/cost-bar"
 import { GateCard, NodeCard } from "@/components/screens/run/node-card"
 import { RunMeta } from "@/components/screens/run/run-meta"
 import { useRunView } from "@/lib/stores/run-view"
@@ -37,8 +36,6 @@ export function Timeline({ nodes, runId }: { nodes: RunNode[]; runId: string }) 
           )
         )}
       </div>
-
-      <CostBar pct={20} />
     </div>
   )
 }

@@ -14,7 +14,7 @@ export const EVENT_STREAM: AgentEvent[] = [
   { t: "00:09.0", kind: "tool", msg: "browser › click 'Add to cart' on SKU-A4421" },
   { t: "00:09.4", kind: "fs", msg: "wrote outputs/artifacts/screenshot-01.png (78 KB)" },
   { t: "00:10.1", kind: "tool", msg: "shell › node merge-stress.js --items 500" },
-  { t: "00:11.7", kind: "http", msg: "POST /api/cart/merge → 200 OK in 1.9 s (within budget)" },
+  { t: "00:11.7", kind: "http", msg: "POST /api/cart/merge → 200 OK in 1.9 s" },
   { t: "00:12.4", kind: "thought", msg: "Trying race: two parallel POST /cart/save with different keys, 150ms apart." },
   { t: "00:12.9", kind: "http", msg: "POST /api/cart/save → 200 OK, cart_id=cart_77ab13" },
   { t: "00:13.0", kind: "http", msg: "POST /api/cart/save → 200 OK, cart_id=cart_77ab14  ⚠ second cart created" },

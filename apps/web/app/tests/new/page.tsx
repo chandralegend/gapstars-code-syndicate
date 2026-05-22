@@ -15,13 +15,11 @@ import { cn } from "@/lib/utils"
 
 export default function NewTestPage() {
   useSetBreadcrumbs([
-    { label: "acme/shop", muted: true },
     { label: "Tests", href: "/tests" },
     { label: "New brief" },
   ])
   const router = useRouter()
   const [name, setName] = useState("Saved Carts — Cross-Device Persistence")
-  const [budget, setBudget] = useState("2.00")
   const [sandbox, setSandbox] = useState<"e2b" | "cu">("e2b")
 
   return (
@@ -78,25 +76,12 @@ export default function NewTestPage() {
           label="References (optional)"
           help="Repo paths, design docs, Figma URLs — anything the agents should read."
         >
-          <Input defaultValue="github.com/acme-corp/shop/blob/main/api/v2/cart.py, web/src/CartPage.tsx" />
+          <Input defaultValue="github.com/example-org/shop/blob/main/api/v2/cart.py, web/src/CartPage.tsx" />
         </Field>
 
         <div className="pt-2">
           <CapLine className="mb-2">orchestration</CapLine>
         </div>
-
-        <Field label="Budget cap (USD)">
-          <div className="flex items-center gap-3">
-            <Input
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              className="w-[130px]"
-            />
-            <span className="text-ink-3 text-[12px]">
-              The run halts if estimated cost exceeds this cap.
-            </span>
-          </div>
-        </Field>
 
         <Field label="Sandbox mode">
           <div className="border-border bg-card inline-flex overflow-hidden rounded-md border">

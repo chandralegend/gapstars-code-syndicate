@@ -17,7 +17,6 @@ import type { Script } from "@/lib/types"
 
 export default function ScriptsPage() {
   useSetBreadcrumbs([
-    { label: "acme/shop", muted: true },
     { label: "Saved Carts", muted: true, href: "/tests" },
     { label: "Scripts" },
   ])

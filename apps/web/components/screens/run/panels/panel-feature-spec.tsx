@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {
-  ActivityIcon,
   AlertTriangleIcon,
   CheckIcon,
   FileTextIcon,
@@ -10,7 +9,6 @@ import {
   GitCommitIcon,
   MoreHorizontalIcon,
   SendIcon,
-  SparklesIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -60,9 +58,6 @@ export function PanelFeatureSpec() {
               +3 −1
             </span>
           </Tab>
-          <Tab value="trace" icon={<ActivityIcon className="size-[13px]" />}>
-            Trace
-          </Tab>
         </TabsList>
 
         <TabsContent value="spec" className="min-h-0 flex-1 overflow-auto px-6 py-5">
@@ -70,9 +65,6 @@ export function PanelFeatureSpec() {
         </TabsContent>
         <TabsContent value="diff" className="min-h-0 flex-1 overflow-auto px-6 py-5">
           <DiffBody />
-        </TabsContent>
-        <TabsContent value="trace" className="min-h-0 flex-1 overflow-auto px-6 py-5">
-          <TraceBody />
         </TabsContent>
       </Tabs>
 
@@ -207,11 +199,6 @@ function SpecBody() {
           ))}
         </div>
       </Section>
-
-      <div className="text-ink-4 flex items-center gap-1.5 pt-3 font-mono text-[11px]">
-        <SparklesIcon className="size-[11px]" />
-        Generated from brief + 4 repo references · agent reasoned for 21.4 s
-      </div>
     </div>
   )
 }
@@ -263,49 +250,6 @@ function DiffBody() {
           {l.t}
         </div>
       ))}
-    </div>
-  )
-}
-
-function TraceBody() {
-  const calls = [
-    { t: "+0.0s", model: "Claude Sonnet 4.5", tokens: "1.2k → 0.4k", cost: "$0.004", purpose: "Plan structure of FeatureExpectation" },
-    { t: "+2.1s", model: "Claude Sonnet 4.5", tokens: "6.4k → 1.8k", cost: "$0.029", purpose: "Extract data contracts from repo refs" },
-    { t: "+8.3s", model: "Claude Sonnet 4.5", tokens: "5.1k → 1.1k", cost: "$0.022", purpose: "Draft user flows" },
-    { t: "+14.6s", model: "Claude Sonnet 4.5", tokens: "5.7k → 1.4k", cost: "$0.027", purpose: "Synthesize acceptance criteria" },
-  ]
-  return (
-    <div>
-      <div className="mb-3 flex items-center gap-2">
-        <div className="font-serif text-[20px]" style={{ fontFamily: "var(--font-serif), serif" }}>
-          4 LLM calls
-        </div>
-        <Badge variant="muted">streamed via Langfuse</Badge>
-      </div>
-      <div className="border-border bg-card overflow-hidden rounded-md border">
-        <table className="w-full text-[12.5px]">
-          <thead className="text-ink-3 bg-muted/50 text-left text-[11px] tracking-wider uppercase">
-            <tr>
-              <th className="px-3 py-2">When</th>
-              <th className="px-3 py-2">Purpose</th>
-              <th className="px-3 py-2">Model</th>
-              <th className="px-3 py-2">Tokens</th>
-              <th className="px-3 py-2 text-right">Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {calls.map((c, i) => (
-              <tr key={i} className="border-border border-t">
-                <td className="px-3 py-2 font-mono">{c.t}</td>
-                <td className="px-3 py-2">{c.purpose}</td>
-                <td className="px-3 py-2 font-mono">{c.model}</td>
-                <td className="px-3 py-2 font-mono">{c.tokens}</td>
-                <td className="px-3 py-2 text-right font-mono">{c.cost}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   )
 }

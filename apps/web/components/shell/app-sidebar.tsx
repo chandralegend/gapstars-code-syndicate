@@ -3,12 +3,8 @@
 import { usePathname, useRouter } from "next/navigation"
 import {
   ActivityIcon,
-  BellIcon,
-  ChevronsUpDownIcon,
   CodeIcon,
-  DatabaseIcon,
   FlaskConicalIcon,
-  GaugeIcon,
   HistoryIcon,
   Settings2Icon,
   SparklesIcon,
@@ -59,11 +55,6 @@ const WORKSPACE: NavItem[] = [
 const PROJECT: NavItem[] = [
   { href: "/onboard", icon: SparklesIcon, label: "Onboarding" },
   { href: "/settings", icon: Settings2Icon, label: "Settings" },
-]
-
-const OBSERVABILITY: NavItem[] = [
-  { href: "/cost", icon: GaugeIcon, label: "Cost & usage" },
-  { href: "/traces", icon: DatabaseIcon, label: "Langfuse traces" },
 ]
 
 function ProbeMark() {
@@ -129,24 +120,6 @@ export function AppSidebar() {
             Pr<em className="text-accent not-italic italic">o</em>be
           </div>
         </div>
-
-        <button
-          type="button"
-          className="bg-sidebar-accent/60 border-sidebar-border hover:bg-sidebar-accent mt-1 flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left group-data-[state=collapsed]:hidden"
-        >
-          <span className="grid size-[22px] place-items-center rounded-[5px] bg-gradient-to-br from-[oklch(0.65_0.15_200)] to-[oklch(0.55_0.15_280)] font-mono text-[11px] font-semibold text-white">
-            AC
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12.5px] font-medium text-[oklch(0.96_0.005_80)]">
-              acme/shop
-            </span>
-            <span className="text-sidebar-foreground/60 block truncate text-[11px]">
-              staging.acme.shop
-            </span>
-          </span>
-          <ChevronsUpDownIcon className="text-sidebar-foreground/50 size-[13px]" />
-        </button>
       </SidebarHeader>
 
       <SidebarContent>
@@ -167,33 +140,9 @@ export function AppSidebar() {
             <SidebarMenu>{renderNav(PROJECT)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/55 text-[10.5px] tracking-[0.08em] uppercase">
-            Observability
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>{renderNav(OBSERVABILITY)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        <div className="border-sidebar-border flex items-center gap-2.5 border-t px-2 pt-3 group-data-[state=collapsed]:hidden">
-          <span className="grid size-[26px] place-items-center rounded-full bg-gradient-to-br from-[oklch(0.7_0.12_30)] to-[oklch(0.55_0.15_350)] font-mono text-[11px] font-semibold text-white">
-            MC
-          </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-[12.5px] text-[oklch(0.96_0.005_80)]">
-              Mira Chen
-            </div>
-            <div className="text-sidebar-foreground/55 truncate font-mono text-[10.5px]">
-              mira@acme.co
-            </div>
-          </div>
-          <BellIcon className="text-sidebar-foreground/55 size-[14px]" />
-        </div>
-      </SidebarFooter>
+      <SidebarFooter />
 
       <SidebarRail />
     </Sidebar>
