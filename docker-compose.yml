@@ -73,6 +73,43 @@ services:
         - action: rebuild
           path: ./apps/web/package.json
 
+  claude-sandbox-svc:
+    build:
+      context: ./apps/claude-sandbox-svc
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      TOKEN_SECRET: ${TOKEN_SECRET:-dev-secret-change-me}
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE:-qa-sandbox:local}
+      SANDBOX_MEM_LIMIT: ${SANDBOX_MEM_LIMIT:-2g}
+      SANDBOX_CPUS: ${SANDBOX_CPUS:-1.0}
+      MAX_CONCURRENT_TASKS: ${MAX_CONCURRENT_TASKS:-2}
+      DEFAULT_TIMEOUT_SECONDS: ${DEFAULT_TIMEOUT_SECONDS:-1800}
+      RETENTION_DAYS: ${RETENTION_DAYS:-7}
+      DATA_DIR: /data
+      PUBLIC_BASE_URL: ${SANDBOX_PUBLIC_BASE_URL:-http://localhost:8100}
+      VNC_PROXY_MODE: ${VNC_PROXY_MODE:-proxy}
+      VNC_BIND_HOST: ${VNC_BIND_HOST:-127.0.0.1}
+      DEFAULT_MODEL: ${SANDBOX_DEFAULT_MODEL:-claude-sonnet-4-5-20250929}
+    ports:
+      - "${SANDBOX_PORT:-8100}:8000"
+    volumes:
+      # The service spawns sandbox containers via the host Docker daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Per-task artifacts live on the host so they survive restarts and so
+      # the spawned sandbox containers can bind-mount them by absolute host path.
+      - sandbox_data:/data
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/claude-sandbox-svc/app
+          target: /app/app
+        - action: rebuild
+          path: ./apps/claude-sandbox-svc/pyproject.toml
+
 volumes:
   postgres_data:
   redis_data:
+  sandbox_data:
