@@ -1,6 +1,17 @@
 import { createParser } from "eventsource-parser"
 
-import { API_URL, type StreamChunk } from "@/lib/types"
+import { API_URL, type LLMProviderName, type ProvidersResponse, type StreamChunk } from "@/lib/types"
+
+/**
+ * Fetch the list of available LLM providers and their models from the API.
+ */
+export async function fetchProviders(): Promise<ProvidersResponse> {
+  const response = await fetch(`${API_URL}/api/providers`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch providers: ${response.status} ${response.statusText}`)
+  }
+  return response.json() as Promise<ProvidersResponse>
+}
 
 /**
  * Sends a message to the FastAPI SSE streaming endpoint and yields parsed chunks.
@@ -15,12 +26,19 @@ import { API_URL, type StreamChunk } from "@/lib/types"
  */
 export async function* streamChat(
   message: string,
-  threadId: string
+  threadId: string,
+  provider?: LLMProviderName,
+  model?: string
 ): AsyncGenerator<StreamChunk, void, unknown> {
   const response = await fetch(`${API_URL}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, thread_id: threadId }),
+    body: JSON.stringify({
+      message,
+      thread_id: threadId,
+      ...(provider && { provider }),
+      ...(model && { model }),
+    }),
   })
 
   if (!response.ok) {

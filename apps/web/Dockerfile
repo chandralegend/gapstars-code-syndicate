@@ -16,6 +16,10 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Receive public API URL at build time so Next.js can bake it into the bundle
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN bun run build
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────

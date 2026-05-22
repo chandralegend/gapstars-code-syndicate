@@ -2,6 +2,52 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000
 
 export type AgentName = "triage" | "order_support" | "technical_support"
 
+// ── LLM provider types ───────────────────────────────────────────────────────
+
+export type LLMProviderName = "openai" | "mistral" | "anthropic"
+
+export interface ModelInfo {
+  id: string
+  name: string
+}
+
+export interface ProviderInfo {
+  id: LLMProviderName
+  name: string
+  available: boolean
+  default_model: string
+  models: ModelInfo[]
+}
+
+export interface ProvidersResponse {
+  providers: ProviderInfo[]
+  default_provider: LLMProviderName
+}
+
+export const PROVIDER_DISPLAY: Record<
+  LLMProviderName,
+  { label: string; icon: string; color: string; textColor: string }
+> = {
+  openai: {
+    label: "OpenAI",
+    icon: "openai",
+    color: "bg-emerald-100 dark:bg-emerald-900/40",
+    textColor: "text-emerald-700 dark:text-emerald-300",
+  },
+  mistral: {
+    label: "Mistral AI",
+    icon: "mistral",
+    color: "bg-orange-100 dark:bg-orange-900/40",
+    textColor: "text-orange-700 dark:text-orange-300",
+  },
+  anthropic: {
+    label: "Anthropic",
+    icon: "anthropic",
+    color: "bg-amber-100 dark:bg-amber-900/40",
+    textColor: "text-amber-700 dark:text-amber-300",
+  },
+}
+
 // ── Activity events (agent transitions, tool calls) ─────────────────────────
 
 export type ActivityEvent =
@@ -17,6 +63,8 @@ export interface ChatMessage {
   content: string
   createdAt: Date
   agent?: AgentName
+  provider?: LLMProviderName
+  model?: string
   /** Activity events that occurred during this assistant response */
   activity: ActivityEvent[]
 }

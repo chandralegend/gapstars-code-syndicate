@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LLMProviderName = Literal["openai", "mistral", "anthropic"]
 
 
 class Settings(BaseSettings):
@@ -13,17 +16,28 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LLM
+    # ── Default provider ──────────────────────────────────────────────────────
+    llm_provider: LLMProviderName = "openai"
+
+    # ── OpenAI ────────────────────────────────────────────────────────────────
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
 
-    # Postgres
+    # ── Mistral ───────────────────────────────────────────────────────────────
+    mistral_api_key: str = ""
+    mistral_model: str = "mistral-small-latest"
+
+    # ── Anthropic ─────────────────────────────────────────────────────────────
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-6"
+
+    # ── Postgres ──────────────────────────────────────────────────────────────
     database_url: str = "postgresql://postgres:postgres@localhost:5432/multiagent"
 
-    # Redis
+    # ── Redis ─────────────────────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379"
 
-    # API server
+    # ── API server ────────────────────────────────────────────────────────────
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: str = "http://localhost:3000"
@@ -31,6 +45,22 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    def default_model_for(self, provider: LLMProviderName) -> str:
+        """Return the configured default model for the given provider."""
+        return {
+            "openai": self.openai_model,
+            "mistral": self.mistral_model,
+            "anthropic": self.anthropic_model,
+        }[provider]
+
+    def api_key_for(self, provider: LLMProviderName) -> str:
+        """Return the API key for the given provider."""
+        return {
+            "openai": self.openai_api_key,
+            "mistral": self.mistral_api_key,
+            "anthropic": self.anthropic_api_key,
+        }[provider]
 
 
 @lru_cache

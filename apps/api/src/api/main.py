@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.agent.checkpointer import create_checkpointer
 from api.agent.graph import build_graph
+from api.agent.llm_factory import create_llm
 from api.config import settings
-from api.routers import agent_router
+from api.routers import agent_router, providers_router
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,19 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting up — initialising Postgres checkpointer…")
     checkpointer, pool = await create_checkpointer()
-    app.state.graph = build_graph(checkpointer=checkpointer)
-    logger.info("Agent graph ready")
+
+    # Store checkpointer so per-request graph building can reuse it
+    app.state.checkpointer = checkpointer
+
+    # Cache of compiled graphs keyed by "provider:model"
+    app.state.graphs = {}
+
+    # Pre-build the default graph so the first request isn't slow
+    default_llm = create_llm()
+    default_key = f"{settings.llm_provider}:{settings.default_model_for(settings.llm_provider)}"
+    app.state.graphs[default_key] = build_graph(checkpointer=checkpointer, llm=default_llm)
+
+    logger.info("Agent graph ready (default: %s)", default_key)
 
     yield
 
@@ -49,6 +61,7 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(agent_router)
+    app.include_router(providers_router)
 
     # ── Health ────────────────────────────────────────────────────────────────
     @app.get("/api/health", tags=["health"])

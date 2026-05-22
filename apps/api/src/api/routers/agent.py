@@ -10,6 +10,8 @@ from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from api.config import LLMProviderName, settings
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -33,6 +35,20 @@ class ChatRequest(BaseModel):
             "Reuse the same ID to continue a conversation."
         ),
     )
+    provider: LLMProviderName | None = Field(
+        default=None,
+        description=(
+            "LLM provider to use: 'openai', 'mistral', or 'anthropic'. "
+            "Defaults to the server-configured provider."
+        ),
+    )
+    model: str | None = Field(
+        default=None,
+        description=(
+            "Model name for the chosen provider. "
+            "Defaults to the server-configured model for that provider."
+        ),
+    )
 
 
 class ChatResponse(BaseModel):
@@ -44,9 +60,28 @@ class ChatResponse(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _get_graph(request):
-    """Retrieve the compiled graph attached to the app state."""
-    return request.app.state.graph
+def _get_graph_for_request(request, provider: LLMProviderName | None, model: str | None):
+    """Return a compiled graph for the given provider/model combination.
+
+    Uses a per-provider graph cache stored in ``app.state.graphs``.
+    Falls back to the default graph when no provider/model override is given.
+    """
+    resolved_provider: LLMProviderName = provider or settings.llm_provider
+    resolved_model: str = model or settings.default_model_for(resolved_provider)
+    cache_key = f"{resolved_provider}:{resolved_model}"
+
+    graphs: dict = request.app.state.graphs
+    if cache_key not in graphs:
+        from api.agent.graph import build_graph
+        from api.agent.llm_factory import create_llm
+
+        llm = create_llm(resolved_provider, resolved_model)
+        graphs[cache_key] = build_graph(
+            checkpointer=request.app.state.checkpointer,
+            llm=llm,
+        )
+
+    return graphs[cache_key]
 
 
 def _friendly_tool_name(name: str) -> str:
@@ -64,7 +99,7 @@ def _friendly_tool_name(name: str) -> str:
 )
 async def chat(body: ChatRequest, request: __import__("fastapi").Request):
     """Invoke the agent and return the complete response as JSON."""
-    graph = _get_graph(request)
+    graph = _get_graph_for_request(request, body.provider, body.model)
     config = {"configurable": {"thread_id": body.thread_id}}
 
     result = await graph.ainvoke(
@@ -101,7 +136,7 @@ async def chat_stream(
     - ``done``        — final event, data: ``{"thread_id": "..."}``
     - ``error``       — data: ``{"detail": "..."}``
     """
-    graph = _get_graph(request)
+    graph = _get_graph_for_request(request, body.provider, body.model)
     config = {"configurable": {"thread_id": body.thread_id}}
 
     async def event_generator() -> AsyncGenerator[dict, None]:
@@ -193,12 +228,18 @@ async def chat_stream(
                 if kind == "on_chat_model_stream":
                     chunk = event["data"].get("chunk")
                     if chunk and chunk.content:
-                        yield {
-                            "event": "token",
-                            "data": json.dumps(
-                                {"token": chunk.content}
-                            ),
-                        }
+                        # Anthropic may return a list of content blocks
+                        content = chunk.content
+                        if isinstance(content, list):
+                            content = "".join(
+                                c.get("text", "") if isinstance(c, dict) else str(c)
+                                for c in content
+                            )
+                        if content:
+                            yield {
+                                "event": "token",
+                                "data": json.dumps({"token": content}),
+                            }
 
             yield {
                 "event": "done",

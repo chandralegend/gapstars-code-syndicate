@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Literal
 
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, RemoveMessage, SystemMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -16,7 +16,6 @@ from api.agent.state import AgentState
 from api.agent.tools.order_tools import ORDER_TOOLS
 from api.agent.tools.technical_tools import TECHNICAL_TOOLS
 from api.agent.tools.triage_tools import TRIAGE_TOOLS
-from api.config import settings
 
 # ── Routing tool (used by the Triage agent to delegate) ──────────────────────
 
@@ -37,7 +36,10 @@ def route_to_agent(agent_name: str) -> str:
 # ── Build the supervisor multi-agent graph ───────────────────────────────────
 
 
-def build_graph(checkpointer: BaseCheckpointSaver | None = None):
+def build_graph(
+    checkpointer: BaseCheckpointSaver | None = None,
+    llm: BaseChatModel | None = None,
+):
     """Build and compile the supervisor-pattern multi-agent graph.
 
     Architecture:
@@ -51,15 +53,15 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
 
     Args:
         checkpointer: Optional checkpoint saver for persistent conversation state.
+        llm: Optional pre-built chat model. If omitted the default from settings is used.
 
     Returns:
         A compiled LangGraph ``CompiledGraph`` instance.
     """
-    llm = ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
-        streaming=True,
-    )
+    if llm is None:
+        from api.agent.llm_factory import create_llm
+
+        llm = create_llm()
 
     # ── LLMs with tools bound ────────────────────────────────────────────
 
