@@ -10,6 +10,7 @@ from api.agent.checkpointer import create_checkpointer
 from api.agent.graph import build_graph
 from api.agent.llm_factory import create_llm
 from api.config import settings
+from api.db.engine import engine as db_engine
 from api.routers import agent_router, providers_router
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down — closing connection pool…")
     await pool.close()
+    await db_engine.dispose()
 
 
 def create_app() -> FastAPI:
