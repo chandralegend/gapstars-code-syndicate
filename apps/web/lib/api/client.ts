@@ -76,6 +76,9 @@ export type FeedbackRequest = Schemas["FeedbackRequest"]
 export type SandboxFileList = Schemas["SandboxFileList"]
 export type SandboxFile = Schemas["SandboxFile"]
 
+export type SandboxScreenshotList = Schemas["SandboxScreenshotList"]
+export type SandboxScreenshot = Schemas["SandboxScreenshot"]
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

@@ -20,10 +20,18 @@ class FeatureExpectationOutput(BaseModel):
         description="Inputs, outputs, data formats, and API contracts relevant to this feature"
     )
     edge_cases: list[str] = Field(
-        description="Edge cases, boundary conditions, and error scenarios to test"
+        description=(
+            "Edge cases, boundary conditions, and error scenarios to test. "
+            "Keep this list focused — at most 8 entries."
+        )
     )
     expanded_acceptance_criteria: list[str] = Field(
-        description="Acceptance criteria expanded from the user's input with additional detail"
+        description=(
+            "The acceptance criteria the test cases will verify. Hard cap: at "
+            "most 10 entries. Each entry must be a single concrete, "
+            "verifiable statement. Do not pad with trivial or duplicate "
+            "criteria — prefer fewer, sharper statements over many vague ones."
+        )
     )
     dependencies_and_assumptions: list[str] = Field(
         description="External dependencies, assumptions, and constraints"
@@ -35,11 +43,19 @@ You are a senior QA analyst. Your job is to produce a detailed feature \
 expectation document based on the project context and test scenario inputs.
 
 The document should cover every aspect a QA engineer would need to write \
-thorough test cases — user flows, data contracts, edge cases, and expanded \
+thorough test cases — user flows, data contracts, edge cases, and \
 acceptance criteria.
 
-Be specific and concrete. Reference the project's tech stack and target users \
-where relevant. Do not be vague or generic."""
+Be specific and concrete. Reference the project's tech stack and target \
+users where relevant. Do not be vague or generic.
+
+Hard limits:
+- ``expanded_acceptance_criteria`` MUST contain at most 10 entries. Choose \
+  the most important, distinct, verifiable criteria. Do not split a single \
+  idea across multiple bullets to inflate the count.
+- ``edge_cases`` should be at most 8 entries.
+- Every criterion must be observable and verifiable. Avoid restating the \
+  feature description as criteria."""
 
 
 def build_initial_prompt(state: dict) -> str:

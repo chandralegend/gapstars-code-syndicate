@@ -46,14 +46,17 @@ import {
   getTestCases,
   getTestScenario,
   listSandboxFiles,
+  listSandboxScreenshots,
   readSandboxFile,
   runEventsUrl,
+  sandboxFileUrl,
   submitFeedback,
   useFetch,
   useMutation,
   type FeatureExpectation,
   type Run,
   type SandboxFileList,
+  type SandboxScreenshotList,
   type TestCase,
 } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
@@ -1081,7 +1084,8 @@ function SandboxPanel({
       f.path !== "output/workspace/events.jsonl" &&
       f.path !== "output/trace.jsonl" &&
       f.path !== "output/.ready" &&
-      f.path !== "input.json",
+      f.path !== "input.json" &&
+      !f.path.startsWith("output/screenshots/"),
   )
 
   return (
@@ -1091,6 +1095,8 @@ function SandboxPanel({
         {" · "}
         {list.files.length} file{list.files.length === 1 ? "" : "s"}
       </div>
+
+      <LiveScreenView runId={runId} runStatus={runStatus} />
 
       {findings && <FindingsBlock runId={runId} path={findings.path} />}
       {events && <EventsBlock runId={runId} path={events.path} />}
@@ -1103,7 +1109,7 @@ function SandboxPanel({
               <li key={f.path} className="flex items-center gap-2">
                 <FileTextIcon className="text-ink-4 size-[12px]" />
                 <a
-                  href={`/api/runs/${runId}/sandbox/files/${f.path}`}
+                  href={sandboxFileUrl(runId, f.path)}
                   target="_blank"
                   rel="noreferrer"
                   className="text-foreground hover:underline"
@@ -1270,6 +1276,163 @@ function TraceBlock({
           )}
         </div>
       )}
+    </Section>
+  )
+}
+
+/* ────────────────────────────  Live screen view  ──────────────────────── */
+
+function LiveScreenView({
+  runId,
+  runStatus,
+}: {
+  runId: string
+  runStatus: string
+}) {
+  const isLive = runStatus === "agent2_running"
+  const screenshotsQ = useFetch(
+    useCallback(() => listSandboxScreenshots(runId), [runId]),
+    [runId],
+  )
+
+  // Poll while the sandbox is exploring so the latest screenshot keeps
+  // refreshing. Bail once the run exits agent2_running.
+  useEffect(() => {
+    if (!isLive) return
+    const t = setInterval(() => {
+      void screenshotsQ.mutate()
+    }, 2_500)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, screenshotsQ.mutate])
+
+  const list: SandboxScreenshotList | undefined = screenshotsQ.data
+  const screenshots = list?.screenshots ?? []
+  const latestPath = screenshots.length > 0 ? screenshots[screenshots.length - 1]!.path : null
+
+  // Whether the user is currently pinned to a particular screenshot or
+  // wants to follow the latest. Default: follow.
+  const [pinned, setPinned] = useState<string | null>(null)
+
+  // When new screenshots arrive while we're in "follow" mode, the
+  // displayed image automatically rolls forward to the newest.
+  const displayedPath = pinned ?? latestPath
+  const displayed = screenshots.find((s) => s.path === displayedPath) ??
+    screenshots[screenshots.length - 1] ??
+    null
+
+  if (screenshotsQ.error) {
+    return (
+      <Section title="Live computer view">
+        <div className="text-err-ink text-[12.5px]">
+          {screenshotsQ.error.message}
+        </div>
+      </Section>
+    )
+  }
+
+  if (screenshotsQ.loading && screenshots.length === 0) {
+    return (
+      <Section title="Live computer view">
+        <div className="text-ink-3 text-[12.5px]">Looking for screenshots…</div>
+      </Section>
+    )
+  }
+
+  if (screenshots.length === 0) {
+    return (
+      <Section title="Live computer view">
+        <div className="border-border bg-card text-ink-3 rounded-md border border-dashed px-3 py-6 text-center text-[12.5px]">
+          {isLive
+            ? "Claude hasn't taken any screenshots yet. They'll appear here as soon as it does."
+            : "No screenshots were captured during this run."}
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title="Live computer view">
+      <div className="border-border bg-card overflow-hidden rounded-lg border">
+        <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-2">
+          <div className="flex gap-1.5">
+            <span className="bg-err size-2.5 rounded-full opacity-60" />
+            <span className="bg-warn size-2.5 rounded-full opacity-60" />
+            <span className="bg-ok size-2.5 rounded-full opacity-60" />
+          </div>
+          <span className="text-ink-3 ml-2 font-mono text-[11px]">
+            {displayed?.path.split("/").pop()}
+          </span>
+          {isLive && (
+            <Badge variant="accent" className="ml-2 gap-1.5">
+              <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
+              {pinned ? "paused" : "live"}
+            </Badge>
+          )}
+          <span className="text-ink-4 ml-auto font-mono text-[11px]">
+            {screenshots.length} frame{screenshots.length === 1 ? "" : "s"}
+          </span>
+          {pinned && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPinned(null)}
+            >
+              Follow latest
+            </Button>
+          )}
+        </div>
+        <div className="bg-background relative aspect-[16/10] w-full">
+          {displayed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={displayed.path}
+              src={sandboxFileUrl(runId, displayed.path)}
+              alt={`Sandbox screenshot ${displayed.path}`}
+              className="h-full w-full object-contain"
+              loading="lazy"
+            />
+          ) : null}
+        </div>
+        {screenshots.length > 1 && (
+          <div className="border-border flex gap-1.5 overflow-x-auto border-t px-3 py-2">
+            {screenshots.map((s, i) => (
+              <button
+                key={s.path}
+                type="button"
+                onClick={() =>
+                  setPinned(
+                    pinned === s.path
+                      ? null
+                      : i === screenshots.length - 1
+                        ? null
+                        : s.path,
+                  )
+                }
+                className={cn(
+                  "border-border relative h-12 w-20 shrink-0 overflow-hidden rounded border bg-black",
+                  displayed?.path === s.path
+                    ? "ring-foreground/60 ring-2"
+                    : "hover:border-ink-4/60",
+                )}
+                title={s.path.split("/").pop()}
+                aria-label={`Open ${s.path}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={sandboxFileUrl(runId, s.path)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <span className="bg-black/60 text-background absolute right-1 bottom-1 rounded px-1 font-mono text-[9px]">
+                  {i + 1}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </Section>
   )
 }
