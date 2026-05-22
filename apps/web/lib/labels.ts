@@ -58,6 +58,7 @@ const NODE_LABEL: Record<string, string> = {
   agent_3_generate: "Generating test cases",
   human_review_3: "Test-case review",
   persist_results: "Saving results",
+  script_generation: "Generating test scripts",
 }
 
 const NODE_PHASE: Record<string, string> = {
@@ -68,6 +69,7 @@ const NODE_PHASE: Record<string, string> = {
   agent_3_generate: "Test cases",
   human_review_3: "Test cases",
   persist_results: "Saving",
+  script_generation: "Scripts",
 }
 
 /**
@@ -137,6 +139,10 @@ const EVENT_LABEL: Record<string, string> = {
   sandbox_timeout_warning: "Sandbox running low on time",
   sandbox_timeout_extended: "Sandbox got more time",
   workflow_completed: "Run completed",
+  script_bundle_started: "Generating test scripts",
+  script_bundle_progress: "Test-script progress",
+  script_bundle_succeeded: "Test scripts ready",
+  script_bundle_failed: "Test-script generation failed",
   error: "Error",
   done: "Stream closed",
 }

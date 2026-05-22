@@ -83,6 +83,10 @@ export type SandboxStatus = Schemas["SandboxStatus"]
 export type ExtendRequest = Schemas["ExtendRequest"]
 export type ExtendResponse = Schemas["ExtendResponse"]
 
+export type TestScriptBundle = Schemas["TestScriptBundleRead"]
+export type TestScriptBundleStatus = Schemas["TestScriptBundleStatus"]
+export type BundleFileList = Schemas["BundleFileList"]
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

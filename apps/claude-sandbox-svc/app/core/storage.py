@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import json
 import shutil
+import zipfile
 from pathlib import Path
 
 from app.core.config import get_settings
@@ -77,3 +79,30 @@ def list_task_files(task_id: str) -> list[Path]:
     if not root.exists():
         return []
     return sorted(p for p in root.rglob("*") if p.is_file())
+
+
+def workspace_dir(task_id: str) -> Path:
+    return output_dir(task_id) / "workspace"
+
+
+def build_workspace_zip(task_id: str) -> bytes | None:
+    """Zip up everything Claude wrote under output/workspace/.
+
+    Returns ``None`` if the workspace dir is missing. Excludes nothing —
+    callers can filter at the API layer if they need to.
+    """
+    ws = workspace_dir(task_id)
+    if not ws.exists():
+        return None
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(ws.rglob("*")):
+            if not path.is_file():
+                continue
+            try:
+                rel = path.relative_to(ws)
+            except ValueError:
+                continue
+            zf.write(path, arcname=str(rel))
+    return buf.getvalue()

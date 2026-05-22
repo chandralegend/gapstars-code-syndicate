@@ -7,9 +7,12 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  Code2Icon,
+  DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   SendIcon,
   TimerIcon,
 } from "lucide-react"
@@ -42,7 +45,9 @@ import {
 } from "@/lib/labels"
 import {
   extendSandboxTimeout,
+  generateTestScripts,
   getFeatureExpectation,
+  getLatestScriptBundle,
   getProject,
   getRun,
   getSandboxStatus,
@@ -50,9 +55,12 @@ import {
   getTestScenario,
   listSandboxFiles,
   listSandboxScreenshots,
+  listScriptBundleFiles,
   readSandboxFile,
+  readScriptBundleFile,
   runEventsUrl,
   sandboxFileUrl,
+  scriptBundleDownloadUrl,
   submitFeedback,
   useFetch,
   useMutation,
@@ -62,6 +70,7 @@ import {
   type SandboxScreenshotList,
   type SandboxStatus,
   type TestCase,
+  type TestScriptBundle,
 } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 import { cn } from "@/lib/utils"
@@ -227,6 +236,10 @@ export default function ProjectRunDetailPage({
       "sandbox_timeout_warning",
       "sandbox_timeout_extended",
       "workflow_completed",
+      "script_bundle_started",
+      "script_bundle_progress",
+      "script_bundle_succeeded",
+      "script_bundle_failed",
       "error",
       "done",
     ]
@@ -669,6 +682,9 @@ function RightPanel({
             {sandboxStarted && (
               <Tab value="sandbox">Sandbox activity</Tab>
             )}
+            {status === "completed" && (
+              <Tab value="scripts">Test scripts</Tab>
+            )}
           </TabsList>
 
           <TabsContent value="brief" className="px-6 py-5">
@@ -698,6 +714,12 @@ function RightPanel({
           {sandboxStarted && (
             <TabsContent value="sandbox" className="px-6 py-5">
               <SandboxPanel runId={runId} runStatus={status} />
+            </TabsContent>
+          )}
+
+          {status === "completed" && (
+            <TabsContent value="scripts" className="px-6 py-5">
+              <ScriptsPanel runId={runId} />
             </TabsContent>
           )}
         </Tabs>
@@ -1567,4 +1589,352 @@ function formatRemainingShort(seconds: number): string {
   const r = s % 60
   if (r === 0) return `${m}m`
   return `${m}m ${r}s`
+}
+
+/* ────────────────────────────  Scripts panel  ──────────────────────── */
+
+function ScriptsPanel({ runId }: { runId: string }) {
+  const bundleQ = useFetch(
+    useCallback(() => getLatestScriptBundle(runId), [runId]),
+    [runId],
+  )
+  const generate = useMutation(
+    useCallback(async () => generateTestScripts(runId), [runId]),
+  )
+
+  const bundle: TestScriptBundle | undefined = bundleQ.data ?? undefined
+  const isLive =
+    bundle?.status === "pending" || bundle?.status === "running"
+
+  // Poll while a bundle is still being generated.
+  useEffect(() => {
+    if (!isLive) return
+    const t = setInterval(() => {
+      void bundleQ.mutate()
+    }, 3_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, bundleQ.mutate])
+
+  const handleGenerate = async () => {
+    try {
+      await generate.run()
+      toast.success("Generating test scripts…")
+      await bundleQ.mutate()
+    } catch (e) {
+      toast.error(
+        `Could not start: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
+  }
+
+  if (bundleQ.error) {
+    return (
+      <div className="text-err-ink text-[12.5px]">
+        {bundleQ.error.message}
+      </div>
+    )
+  }
+
+  if (bundleQ.loading && !bundle) {
+    return <div className="text-ink-3 text-[13px]">Loading…</div>
+  }
+
+  if (!bundle) {
+    return (
+      <Section title="Test scripts">
+        <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
+          <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
+            <Code2Icon className="size-[20px]" />
+          </div>
+          <div className="mt-3 text-[16px] font-medium">
+            No test scripts yet
+          </div>
+          <p className="text-ink-3 mt-1 max-w-[480px] text-center text-[13px]">
+            Once you&apos;re happy with the test cases, generate a runnable
+            test-script bundle from the approved cases. The agent picks the
+            framework and gives you a single <code className="bg-muted rounded px-1 py-0.5 font-mono text-[11px]">run.sh</code> entrypoint.
+          </p>
+          <Button
+            variant="accent"
+            className="mt-5"
+            onClick={handleGenerate}
+            disabled={generate.loading}
+          >
+            <Code2Icon className="size-[13px]" />
+            {generate.loading ? "Starting…" : "Generate test scripts"}
+          </Button>
+        </div>
+      </Section>
+    )
+  }
+
+  if (bundle.status === "pending" || bundle.status === "running") {
+    return (
+      <Section title="Test scripts">
+        <div className="border-border bg-card rounded-lg border p-5">
+          <div className="flex items-center gap-3">
+            <span className="bg-accent-soft text-accent-ink inline-flex size-8 items-center justify-center rounded-md">
+              <Code2Icon className="size-[15px]" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14px] font-medium">
+                Generating test scripts (v{bundle.version})…
+              </div>
+              <div className="text-ink-3 text-[12.5px]">
+                The agent is authoring tests in a sandbox. This usually
+                takes 2–5 minutes.
+              </div>
+            </div>
+            <Badge
+              variant="accent"
+              className="gap-1.5"
+            >
+              <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
+              {bundle.status}
+            </Badge>
+          </div>
+          <div className="bg-muted mt-4 h-1 w-full overflow-hidden rounded">
+            <div className="bg-foreground/40 h-full w-1/3 animate-pulse" />
+          </div>
+        </div>
+      </Section>
+    )
+  }
+
+  if (bundle.status === "failed") {
+    return (
+      <Section title="Test scripts">
+        <div className="border-err/40 bg-err-soft/30 rounded-lg border p-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangleIcon className="text-err-ink size-[14px]" />
+            <span className="text-err-ink text-[14px] font-medium">
+              Generation failed
+            </span>
+          </div>
+          {bundle.error && (
+            <pre className="text-err-ink mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[11.5px]">
+              {bundle.error}
+            </pre>
+          )}
+          <Button
+            variant="accent"
+            className="mt-4"
+            onClick={handleGenerate}
+            disabled={generate.loading}
+          >
+            <RotateCcwIcon className="size-[13px]" />
+            {generate.loading ? "Starting…" : "Try again"}
+          </Button>
+        </div>
+      </Section>
+    )
+  }
+
+  // bundle.status === "succeeded"
+  return (
+    <SucceededBundle
+      runId={runId}
+      bundle={bundle}
+      onRegenerate={handleGenerate}
+      regenerating={generate.loading}
+    />
+  )
+}
+
+function SucceededBundle({
+  runId,
+  bundle,
+  onRegenerate,
+  regenerating,
+}: {
+  runId: string
+  bundle: TestScriptBundle
+  onRegenerate: () => void
+  regenerating: boolean
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="border-border bg-card rounded-lg border p-5">
+        <div className="flex items-center gap-3">
+          <span className="bg-ok-soft text-ok-ink inline-flex size-8 items-center justify-center rounded-md">
+            <CheckIcon className="size-[16px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-medium">
+              Bundle ready · v{bundle.version}
+            </div>
+            <div className="text-ink-3 text-[12.5px]">
+              {bundle.framework ?? "framework: ?"} ·{" "}
+              {bundle.language ?? "language: ?"} ·{" "}
+              {bundle.test_count ?? "?"} test
+              {bundle.test_count === 1 ? "" : "s"}
+            </div>
+          </div>
+          <a
+            href={scriptBundleDownloadUrl(runId)}
+            className="border-border bg-card hover:bg-muted text-foreground inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium"
+          >
+            <DownloadIcon className="size-[13px]" />
+            Download bundle
+          </a>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRegenerate}
+            disabled={regenerating}
+          >
+            <RotateCcwIcon className="size-[13px]" />
+            {regenerating ? "Starting…" : "Generate again"}
+          </Button>
+        </div>
+
+        <div className="text-ink-3 mt-3 text-[12.5px]">
+          The bundle has a single entrypoint. To run it locally:
+        </div>
+        <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 font-mono text-[12px]">
+{`unzip bundle-run-${runId.slice(0, 8)}.zip -d bundle && cd bundle
+bash run.sh
+# JUnit report → reports/junit.xml
+# Summary     → reports/summary.json`}
+        </pre>
+      </div>
+
+      <BundleFiles runId={runId} />
+
+      {bundle.manifest && (
+        <Section title="Manifest">
+          <pre className="border-border bg-card max-h-[280px] overflow-auto rounded-md border p-3 font-mono text-[12px]">
+            {JSON.stringify(bundle.manifest, null, 2)}
+          </pre>
+        </Section>
+      )}
+    </div>
+  )
+}
+
+function BundleFiles({ runId }: { runId: string }) {
+  const filesQ = useFetch(
+    useCallback(() => listScriptBundleFiles(runId), [runId]),
+    [runId],
+  )
+  const [selected, setSelected] = useState<string | null>(null)
+
+  const files = filesQ.data?.files ?? []
+  const sortedFiles = useMemo(
+    () =>
+      [...files].sort((a, b) => {
+        // Surface run.sh, manifest.json, README.md at the top.
+        const score = (p: string) => {
+          if (p.endsWith("/run.sh")) return 0
+          if (p.endsWith("/manifest.json")) return 1
+          if (p.toUpperCase().endsWith("/README.MD")) return 2
+          return 3
+        }
+        const sa = score(a.path)
+        const sb = score(b.path)
+        if (sa !== sb) return sa - sb
+        return a.path.localeCompare(b.path)
+      }),
+    [files],
+  )
+
+  // Pick a sensible default when the file list arrives.
+  useEffect(() => {
+    if (selected || sortedFiles.length === 0) return
+    const runSh = sortedFiles.find((f) => f.path.endsWith("/run.sh"))
+    setSelected((runSh ?? sortedFiles[0]!).path)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedFiles])
+
+  if (filesQ.error) {
+    return (
+      <Section title="Files">
+        <div className="text-err-ink text-[12.5px]">
+          {filesQ.error.message}
+        </div>
+      </Section>
+    )
+  }
+  if (filesQ.loading && files.length === 0) {
+    return (
+      <Section title="Files">
+        <div className="text-ink-3 text-[12.5px]">Loading file tree…</div>
+      </Section>
+    )
+  }
+  if (files.length === 0) {
+    return (
+      <Section title="Files">
+        <div className="text-ink-3 text-[12.5px]">
+          No files in the bundle.
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title="Files">
+      <div className="border-border bg-card grid grid-cols-[260px_minmax(0,1fr)] overflow-hidden rounded-lg border">
+        <div className="border-border max-h-[480px] overflow-auto border-r p-2">
+          {sortedFiles.map((f) => {
+            const display = f.path.replace(/^output\/workspace\//, "")
+            const active = selected === f.path
+            return (
+              <button
+                type="button"
+                key={f.path}
+                onClick={() => setSelected(f.path)}
+                className={cn(
+                  "flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[12.5px]",
+                  active
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-ink-2 hover:bg-muted",
+                )}
+                title={display}
+              >
+                <FileTextIcon className="text-ink-4 size-[12px] shrink-0" />
+                <span className="truncate">{display}</span>
+                <span className="text-ink-4 ml-auto font-mono text-[10px]">
+                  {f.size}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="bg-background min-w-0">
+          {selected ? (
+            <FileViewer runId={runId} path={selected} />
+          ) : (
+            <div className="text-ink-3 p-4 text-[12.5px]">
+              Pick a file to preview.
+            </div>
+          )}
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+function FileViewer({ runId, path }: { runId: string; path: string }) {
+  const fileQ = useFetch(
+    useCallback(() => readScriptBundleFile(runId, path), [runId, path]),
+    [runId, path],
+  )
+
+  if (fileQ.loading) {
+    return (
+      <div className="text-ink-3 p-4 text-[12.5px]">Loading {path}…</div>
+    )
+  }
+  if (fileQ.error) {
+    return (
+      <div className="text-err-ink p-4 text-[12.5px]">{fileQ.error.message}</div>
+    )
+  }
+  return (
+    <pre className="max-h-[480px] overflow-auto p-4 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
+      {fileQ.data ?? ""}
+    </pre>
+  )
 }
