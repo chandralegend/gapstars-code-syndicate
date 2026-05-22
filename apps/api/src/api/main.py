@@ -11,7 +11,13 @@ from api.agent.graph import build_graph
 from api.agent.llm_factory import create_llm
 from api.config import settings
 from api.db.engine import engine as db_engine
-from api.routers import agent_router, providers_router
+from api.routers import (
+    agent_router,
+    projects_router,
+    providers_router,
+    runs_router,
+    test_scenarios_router,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +70,9 @@ def create_app() -> FastAPI:
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(agent_router)
     app.include_router(providers_router)
+    app.include_router(projects_router)
+    app.include_router(test_scenarios_router)
+    app.include_router(runs_router)
 
     # ── Health ────────────────────────────────────────────────────────────────
     @app.get("/api/health", tags=["health"])
