@@ -21,7 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +29,7 @@ from api.config import settings
 from api.db.models.agent_event import AgentEvent
 from api.db.session import get_session
 from api.sandbox import SandboxClient, SandboxError
-from api.services import run_service
+from api.services import agent_event_service, run_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["sandbox-artifacts"])
@@ -55,6 +55,33 @@ class SandboxScreenshotList(BaseModel):
     task_id: str
     count: int
     screenshots: list[SandboxScreenshot]
+
+
+class SandboxStatus(BaseModel):
+    task_id: str
+    status: str
+    error: str | None
+    started_at: str | None
+    finished_at: str | None
+    timeout_seconds: int | None = None
+    elapsed_seconds: float | None = None
+    remaining_seconds: float | None = None
+
+
+class ExtendRequest(BaseModel):
+    extra_seconds: int = Field(
+        default=180,
+        ge=30,
+        le=24 * 3600,
+        description="How many seconds to add to the sandbox's timeout budget.",
+    )
+
+
+class ExtendResponse(BaseModel):
+    task_id: str
+    previous_timeout_seconds: int
+    timeout_seconds: int
+    added_seconds: int
 
 
 # Extensions that should be returned as text by the file-fetch endpoint.
@@ -266,4 +293,133 @@ async def get_sandbox_file(
         # Mark images cacheable on the browser for a short window — the
         # artifacts are immutable once written.
         headers={"Cache-Control": "private, max-age=30"},
+    )
+
+
+@router.get(
+    "/api/runs/{run_id}/sandbox/status",
+    response_model=SandboxStatus,
+)
+async def get_sandbox_status(
+    run_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> SandboxStatus:
+    """Live status of the sandbox task backing this run.
+
+    Includes timeout / elapsed / remaining seconds so the frontend can
+    show a deadline countdown and offer to extend.
+    """
+    run = await run_service.get_by_id(session, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    task_id = await _resolve_task_id(session, run_id)
+    if task_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No sandbox task has been created for this run yet",
+        )
+
+    async with SandboxClient(settings.sandbox_base_url) as sandbox:
+        try:
+            state = await sandbox.get_task(task_id)
+        except SandboxError as exc:
+            raise HTTPException(
+                status_code=502, detail=f"sandbox-svc error: {exc}"
+            ) from exc
+
+    # The sandbox's GET /tasks/:id doesn't expose timeout_seconds, so we
+    # fetch it via the same endpoint by re-using the raw response. Quick
+    # extra call to /tasks/:id again with raw json.
+    timeout_seconds: int | None = None
+    elapsed: float | None = None
+    remaining: float | None = None
+    try:
+        async with SandboxClient(settings.sandbox_base_url) as sandbox:
+            raw = await sandbox._client.get(f"/tasks/{task_id}")  # noqa: SLF001
+            if raw.status_code == 200:
+                body = raw.json()
+                ts = body.get("timeout_seconds")
+                if isinstance(ts, int):
+                    timeout_seconds = ts
+    except Exception as exc:  # pragma: no cover — best-effort
+        logger.warning("sandbox status timeout fetch failed: %s", exc)
+
+    if state.started_at and timeout_seconds is not None:
+        from datetime import datetime, timezone
+
+        try:
+            started = datetime.fromisoformat(state.started_at)
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            elapsed = (now - started).total_seconds()
+            remaining = max(0.0, float(timeout_seconds) - elapsed)
+        except Exception:
+            pass
+
+    return SandboxStatus(
+        task_id=task_id,
+        status=state.status,
+        error=state.error,
+        started_at=state.started_at,
+        finished_at=state.finished_at,
+        timeout_seconds=timeout_seconds,
+        elapsed_seconds=elapsed,
+        remaining_seconds=remaining,
+    )
+
+
+@router.post(
+    "/api/runs/{run_id}/sandbox/extend",
+    response_model=ExtendResponse,
+)
+async def extend_sandbox_timeout(
+    run_id: uuid.UUID,
+    body: ExtendRequest,
+    session: AsyncSession = Depends(get_session),
+) -> ExtendResponse:
+    """Give the sandbox more time to finish.
+
+    Bumps the underlying sandbox task's ``timeout_seconds``. The runner
+    re-reads the value on its next 2-second tick, so the change is live.
+    Emits an ``agent_event`` so the frontend timeline reflects the
+    extension.
+    """
+    run = await run_service.get_by_id(session, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    task_id = await _resolve_task_id(session, run_id)
+    if task_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No sandbox task has been created for this run yet",
+        )
+
+    async with SandboxClient(settings.sandbox_base_url) as sandbox:
+        try:
+            result = await sandbox.extend_task(task_id, body.extra_seconds)
+        except SandboxError as exc:
+            raise HTTPException(
+                status_code=502, detail=f"sandbox-svc error: {exc}"
+            ) from exc
+
+    await agent_event_service.create(
+        session,
+        run_id,
+        node_name="agent_2_placeholder",
+        event_type="sandbox_timeout_extended",
+        payload={
+            "task_id": task_id,
+            "added_seconds": int(result.get("added_seconds", body.extra_seconds)),
+            "timeout_seconds": int(result.get("timeout_seconds", 0)),
+        },
+    )
+
+    return ExtendResponse(
+        task_id=task_id,
+        previous_timeout_seconds=int(result.get("previous_timeout_seconds", 0)),
+        timeout_seconds=int(result.get("timeout_seconds", 0)),
+        added_seconds=int(result.get("added_seconds", body.extra_seconds)),
     )

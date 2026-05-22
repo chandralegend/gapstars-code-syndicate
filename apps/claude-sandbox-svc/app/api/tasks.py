@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 
 from app.core import storage, tokens
@@ -171,6 +171,55 @@ def cancel_task(task_id: str, request: Request) -> dict:
     runner = request.app.state.task_runner
     runner.request_cancel(task_id)
     return {"id": task_id, "status": "cancelling", "cancelled": True}
+
+
+class TaskExtendRequest(BaseModel):
+    """Body for ``PATCH /tasks/{task_id}``.
+
+    The task runner re-reads ``timeout_seconds`` from the DB every couple
+    of seconds while a container is running, so simply bumping the value
+    here is enough to extend the wall-clock deadline.
+    """
+
+    extra_seconds: int = Field(
+        ..., ge=30, le=24 * 3600, description="Seconds to add to the existing budget"
+    )
+
+
+@router.patch("/tasks/{task_id}")
+def extend_task(task_id: str, body: TaskExtendRequest, request: Request) -> dict:
+    """Extend a running task's timeout budget.
+
+    Adds ``extra_seconds`` to the row's ``timeout_seconds``. The runner
+    will pick the new value up on its next 2-second tick. Has no effect
+    on tasks already in a terminal status.
+    """
+    with session_scope() as db:
+        task = db.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="task not found")
+        if TaskStatus(task.status) in TERMINAL_STATUSES:
+            raise HTTPException(
+                status_code=409,
+                detail=f"task is already {task.status}; cannot extend",
+            )
+        old = task.timeout_seconds
+        task.timeout_seconds = old + body.extra_seconds
+        new = task.timeout_seconds
+
+    logger.info(
+        "task %s timeout extended by %ds (was %ds, now %ds)",
+        task_id,
+        body.extra_seconds,
+        old,
+        new,
+    )
+    return {
+        "id": task_id,
+        "previous_timeout_seconds": old,
+        "timeout_seconds": new,
+        "added_seconds": body.extra_seconds,
+    }
 
 
 @router.get("/tasks/{task_id}/files")

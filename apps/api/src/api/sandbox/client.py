@@ -131,6 +131,26 @@ class SandboxClient:
                 f"sandbox cancel_task failed: {response.status_code} {response.text}"
             )
 
+    async def extend_task(self, task_id: str, extra_seconds: int) -> dict[str, Any]:
+        """Bump the sandbox task's timeout budget.
+
+        Returns the response body from the sandbox-svc, which contains the
+        previous and new ``timeout_seconds`` values.
+        """
+        response = await self._client.patch(
+            f"/tasks/{task_id}",
+            json={"extra_seconds": int(extra_seconds)},
+        )
+        if response.status_code == 404:
+            raise SandboxError(f"sandbox task {task_id} not found")
+        if response.status_code == 409:
+            raise SandboxError(f"task {task_id} is already terminal")
+        if response.status_code >= 400:
+            raise SandboxError(
+                f"sandbox extend_task failed: {response.status_code} {response.text}"
+            )
+        return response.json()
+
     # ── Artifact access ─────────────────────────────────────────────────────
 
     async def list_files(self, task_id: str) -> list[dict[str, Any]]:

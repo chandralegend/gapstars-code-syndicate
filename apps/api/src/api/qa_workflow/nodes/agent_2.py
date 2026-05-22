@@ -83,7 +83,11 @@ async def _run_sandbox_task(state: QAWorkflowState, run_id: uuid.UUID) -> dict:
         await _emit_event(
             run_id,
             event_type="sandbox_task_created",
-            payload={"task_id": task_id, "model": settings.sandbox_default_model},
+            payload={
+                "task_id": task_id,
+                "model": settings.sandbox_default_model,
+                "timeout_seconds": settings.sandbox_default_timeout_seconds,
+            },
         )
 
         # 2. Poll until terminal.
@@ -92,7 +96,17 @@ async def _run_sandbox_task(state: QAWorkflowState, run_id: uuid.UUID) -> dict:
         # 3. Read artefacts.
         outputs = await _collect_outputs(sandbox, task_id, terminal_state)
 
-    if terminal_state.status != "succeeded":
+    has_findings = bool(outputs.get("findings"))
+    is_succeeded = terminal_state.status == "succeeded"
+    # If the sandbox timed out *but* the agent already wrote findings.md,
+    # treat it as a soft success: hand the artefacts to Agent 3 instead of
+    # failing the whole run. The timeout usually means a tool call hung
+    # near the end — the substantive work is already done.
+    is_soft_success = (
+        terminal_state.status == "timeout" and has_findings
+    )
+
+    if not is_succeeded and not is_soft_success:
         await _emit_event(
             run_id,
             event_type="sandbox_task_failed",
@@ -100,11 +114,26 @@ async def _run_sandbox_task(state: QAWorkflowState, run_id: uuid.UUID) -> dict:
                 "task_id": task_id,
                 "status": terminal_state.status,
                 "error": terminal_state.error,
+                "has_findings": has_findings,
             },
         )
         raise SandboxError(
             f"sandbox task {task_id} ended with status={terminal_state.status}: "
             f"{terminal_state.error or 'no error message'}"
+        )
+
+    if is_soft_success:
+        await _emit_event(
+            run_id,
+            event_type="sandbox_task_recovered",
+            payload={
+                "task_id": task_id,
+                "status": terminal_state.status,
+                "note": (
+                    "The sandbox hit its deadline but findings.md was already "
+                    "written; continuing with what was captured."
+                ),
+            },
         )
 
     await _emit_event(
@@ -113,7 +142,8 @@ async def _run_sandbox_task(state: QAWorkflowState, run_id: uuid.UUID) -> dict:
         payload={
             "task_id": task_id,
             "files": [f["path"] for f in outputs.get("files", [])],
-            "has_findings": bool(outputs.get("findings")),
+            "has_findings": has_findings,
+            "soft_success": is_soft_success,
         },
     )
 
@@ -125,20 +155,72 @@ async def _poll_until_terminal(
     task_id: str,
     run_id: uuid.UUID,
 ) -> SandboxTaskState:
+    """Poll the sandbox until it reaches a terminal status.
+
+    Emits a one-shot ``sandbox_timeout_warning`` event when remaining
+    time drops below ~60 seconds so the frontend can offer to extend.
+
+    Tolerates a short window of transient HTTP errors (e.g. sandbox-svc
+    restarted briefly): we retry up to ~30 seconds before giving up.
+    """
     interval = max(0.5, float(settings.sandbox_poll_interval_seconds))
     last_status: str | None = None
+    warning_emitted = False
+    consecutive_errors = 0
+    MAX_CONSECUTIVE_ERRORS = 10  # ~30s with 3s interval
     while True:
         try:
             current = await sandbox.get_task(task_id)
+            consecutive_errors = 0
         except SandboxError as exc:
-            # Treat transient HTTP errors during polling as a hard failure;
-            # the run wrapper in routers/runs.py will mark the run failed.
-            await _emit_event(
-                run_id,
-                event_type="sandbox_task_failed",
-                payload={"phase": "poll", "task_id": task_id, "error": str(exc)},
+            consecutive_errors += 1
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                await _emit_event(
+                    run_id,
+                    event_type="sandbox_task_failed",
+                    payload={
+                        "phase": "poll",
+                        "task_id": task_id,
+                        "error": str(exc),
+                        "consecutive_errors": consecutive_errors,
+                    },
+                )
+                raise
+            logger.warning(
+                "sandbox poll error %d/%d for task %s: %s",
+                consecutive_errors,
+                MAX_CONSECUTIVE_ERRORS,
+                task_id,
+                exc,
             )
-            raise
+            await asyncio.sleep(interval)
+            continue
+        except Exception as exc:
+            # Network-layer errors (DNS, connection refused) come through
+            # httpx as transport exceptions, not SandboxError. Retry them
+            # the same way.
+            consecutive_errors += 1
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                await _emit_event(
+                    run_id,
+                    event_type="sandbox_task_failed",
+                    payload={
+                        "phase": "poll",
+                        "task_id": task_id,
+                        "error": str(exc),
+                        "consecutive_errors": consecutive_errors,
+                    },
+                )
+                raise
+            logger.warning(
+                "sandbox poll transport error %d/%d for task %s: %s",
+                consecutive_errors,
+                MAX_CONSECUTIVE_ERRORS,
+                task_id,
+                exc,
+            )
+            await asyncio.sleep(interval)
+            continue
 
         if current.status != last_status:
             await _emit_event(
@@ -151,7 +233,52 @@ async def _poll_until_terminal(
         if current.status in TERMINAL_STATUSES:
             return current
 
+        # Approaching-timeout warning. Best-effort — only fires once per
+        # run, and only when the sandbox has surfaced ``started_at``.
+        if not warning_emitted and current.status == "running":
+            remaining = await _approx_remaining_seconds(sandbox, task_id, current)
+            if remaining is not None and remaining <= 60.0:
+                await _emit_event(
+                    run_id,
+                    event_type="sandbox_timeout_warning",
+                    payload={
+                        "task_id": task_id,
+                        "remaining_seconds": round(remaining, 1),
+                    },
+                )
+                warning_emitted = True
+
         await asyncio.sleep(interval)
+
+
+async def _approx_remaining_seconds(
+    sandbox: SandboxClient,
+    task_id: str,
+    state: SandboxTaskState,
+) -> float | None:
+    """Best-effort 'how much budget is left'. Returns None if unknown."""
+    if not state.started_at:
+        return None
+    try:
+        # Pull the raw row to read timeout_seconds, which the typed
+        # response doesn't expose.
+        raw = await sandbox._client.get(f"/tasks/{task_id}")  # noqa: SLF001
+        if raw.status_code != 200:
+            return None
+        body = raw.json()
+        timeout_seconds = body.get("timeout_seconds")
+        if not isinstance(timeout_seconds, int):
+            return None
+        from datetime import datetime, timezone
+
+        started = datetime.fromisoformat(state.started_at)
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        return max(0.0, float(timeout_seconds) - elapsed)
+    except Exception as exc:
+        logger.debug("could not compute remaining seconds: %s", exc)
+        return None
 
 
 async def _collect_outputs(
