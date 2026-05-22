@@ -55,3 +55,12 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# claude-sandbox-svc runtime data (per-task artifacts, sqlite db)
+apps/claude-sandbox-svc/data/tasks/*/
+apps/claude-sandbox-svc/data/*.db
+apps/claude-sandbox-svc/data/*.db-journal
+apps/claude-sandbox-svc/data/*.db-wal
+apps/claude-sandbox-svc/data/*.db-shm
+!apps/claude-sandbox-svc/data/.gitkeep
+!apps/claude-sandbox-svc/data/tasks/.gitkeep
