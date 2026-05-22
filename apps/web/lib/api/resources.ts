@@ -15,6 +15,7 @@ import {
   type Run,
   type RunCreateResponse,
   type SandboxFileList,
+  type SandboxScreenshotList,
   type TestCase,
   type TestScenario,
   type TestScenarioCreate,
@@ -209,10 +210,7 @@ export async function readSandboxFile(
   // already. We bypass the typed endpoint here since it's modeled as `unknown`
   // by openapi-typescript for path-templated text responses, and use plain fetch
   // through the same base URL so the file path can contain slashes.
-  const url = `${API_URL}/api/runs/${runId}/sandbox/files/${filePath
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}`
+  const url = sandboxFileUrl(runId, filePath)
   const res = await fetch(url)
   if (!res.ok) {
     throw new Error(
@@ -220,4 +218,27 @@ export async function readSandboxFile(
     )
   }
   return await res.text()
+}
+
+/**
+ * Absolute URL for a sandbox artifact, suitable for an ``<img>`` src.
+ *
+ * The OpenAPI ``url`` field on screenshots is relative to the API host.
+ * The browser bundles the API_URL constant so we just prefix.
+ */
+export function sandboxFileUrl(runId: string, filePath: string): string {
+  return `${API_URL}/api/runs/${runId}/sandbox/files/${filePath
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`
+}
+
+export async function listSandboxScreenshots(
+  runId: string,
+): Promise<SandboxScreenshotList> {
+  return unwrap(
+    await apiClient.GET("/api/runs/{run_id}/sandbox/screenshots", {
+      params: { path: { run_id: runId } },
+    }),
+  )
 }

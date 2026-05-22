@@ -172,6 +172,29 @@ class SandboxClient:
             logger.warning("could not decode artifact %s: %s", path, exc)
             return None
 
+    async def read_artifact_bytes(
+        self,
+        task_id: str,
+        path: str,
+    ) -> tuple[bytes, str] | None:
+        """Fetch a binary artifact (e.g. a screenshot) verbatim.
+
+        Returns ``(bytes, content_type)`` or ``None`` if the artifact is
+        missing.
+        """
+        try:
+            response = await self._client.get(f"/tasks/{task_id}/artifacts/{path}")
+        except httpx.HTTPError as exc:
+            raise SandboxError(f"sandbox artifact {path}: {exc}") from exc
+        if response.status_code == 404:
+            return None
+        if response.status_code >= 400:
+            raise SandboxError(
+                f"sandbox artifact {path}: {response.status_code} {response.text}"
+            )
+        content_type = response.headers.get("content-type", "application/octet-stream")
+        return response.content, content_type
+
 
 class SandboxError(RuntimeError):
     """Raised when the sandbox HTTP API returns an error or behaves unexpectedly."""

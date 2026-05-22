@@ -294,6 +294,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/sandbox/screenshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sandbox Screenshots
+         * @description Ordered list of screenshot files for the run, newest last.
+         *
+         *     Each entry includes a download URL the frontend can use as an ``<img>``
+         *     ``src``.
+         */
+        get: operations["list_sandbox_screenshots_api_runs__run_id__sandbox_screenshots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/sandbox/files/{file_path}": {
         parameters: {
             query?: never;
@@ -301,7 +324,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Sandbox File */
+        /**
+         * Get Sandbox File
+         * @description Stream a single artifact file.
+         *
+         *     Text-extension files (``.md``, ``.json``, ``.log`` etc.) are decoded and
+         *     returned as ``text/plain; charset=utf-8``; everything else (PNG, JPEG,
+         *     arbitrary binaries) is streamed verbatim with a guessed content-type so
+         *     browsers can render images directly.
+         */
         get: operations["get_sandbox_file_api_runs__run_id__sandbox_files__file_path__get"];
         put?: never;
         post?: never;
@@ -566,6 +597,24 @@ export interface components {
             task_id: string;
             /** Files */
             files: components["schemas"]["SandboxFile"][];
+        };
+        /** SandboxScreenshot */
+        SandboxScreenshot: {
+            /** Path */
+            path: string;
+            /** Url */
+            url: string;
+            /** Size */
+            size: number;
+        };
+        /** SandboxScreenshotList */
+        SandboxScreenshotList: {
+            /** Task Id */
+            task_id: string;
+            /** Count */
+            count: number;
+            /** Screenshots */
+            screenshots: components["schemas"]["SandboxScreenshot"][];
         };
         /**
          * TestCaseCategory
@@ -1363,6 +1412,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SandboxFileList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sandbox_screenshots_api_runs__run_id__sandbox_screenshots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxScreenshotList"];
                 };
             };
             /** @description Validation Error */
