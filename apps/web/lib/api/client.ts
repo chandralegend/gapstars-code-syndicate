@@ -79,6 +79,10 @@ export type SandboxFile = Schemas["SandboxFile"]
 export type SandboxScreenshotList = Schemas["SandboxScreenshotList"]
 export type SandboxScreenshot = Schemas["SandboxScreenshot"]
 
+export type SandboxStatus = Schemas["SandboxStatus"]
+export type ExtendRequest = Schemas["ExtendRequest"]
+export type ExtendResponse = Schemas["ExtendResponse"]
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

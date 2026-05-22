@@ -94,6 +94,7 @@ class TaskResponse(BaseModel):
     result: dict[str, Any] | None
     vnc_url: str | None = None
     artifacts_url: str | None = None
+    timeout_seconds: int | None = None
 
     @classmethod
     def from_orm_with_urls(
@@ -112,6 +113,7 @@ class TaskResponse(BaseModel):
             result=task.result_json,
             vnc_url=vnc_url,
             artifacts_url=artifacts_url,
+            timeout_seconds=task.timeout_seconds,
         )
 
 

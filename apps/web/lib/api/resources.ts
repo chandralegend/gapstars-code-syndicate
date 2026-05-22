@@ -7,6 +7,7 @@
 import {
   apiClient,
   API_URL,
+  type ExtendResponse,
   type FeatureExpectation,
   type FeedbackRequest,
   type Project,
@@ -16,6 +17,7 @@ import {
   type RunCreateResponse,
   type SandboxFileList,
   type SandboxScreenshotList,
+  type SandboxStatus,
   type TestCase,
   type TestScenario,
   type TestScenarioCreate,
@@ -239,6 +241,26 @@ export async function listSandboxScreenshots(
   return unwrap(
     await apiClient.GET("/api/runs/{run_id}/sandbox/screenshots", {
       params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function getSandboxStatus(runId: string): Promise<SandboxStatus> {
+  return unwrap(
+    await apiClient.GET("/api/runs/{run_id}/sandbox/status", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function extendSandboxTimeout(
+  runId: string,
+  extraSeconds: number,
+): Promise<ExtendResponse> {
+  return unwrap(
+    await apiClient.POST("/api/runs/{run_id}/sandbox/extend", {
+      params: { path: { run_id: runId } },
+      body: { extra_seconds: extraSeconds },
     }),
   )
 }

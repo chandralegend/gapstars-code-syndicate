@@ -11,6 +11,7 @@ import {
   FileTextIcon,
   RefreshCwIcon,
   SendIcon,
+  TimerIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -40,9 +41,11 @@ import {
   runStatusTone,
 } from "@/lib/labels"
 import {
+  extendSandboxTimeout,
   getFeatureExpectation,
   getProject,
   getRun,
+  getSandboxStatus,
   getTestCases,
   getTestScenario,
   listSandboxFiles,
@@ -57,6 +60,7 @@ import {
   type Run,
   type SandboxFileList,
   type SandboxScreenshotList,
+  type SandboxStatus,
   type TestCase,
 } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
@@ -219,6 +223,9 @@ export default function ProjectRunDetailPage({
       "sandbox_task_progress",
       "sandbox_task_completed",
       "sandbox_task_failed",
+      "sandbox_task_recovered",
+      "sandbox_timeout_warning",
+      "sandbox_timeout_extended",
       "workflow_completed",
       "error",
       "done",
@@ -1331,108 +1338,233 @@ function LiveScreenView({
     )
   }
 
-  if (screenshotsQ.loading && screenshots.length === 0) {
-    return (
-      <Section title="Live computer view">
-        <div className="text-ink-3 text-[12.5px]">Looking for screenshots…</div>
-      </Section>
-    )
-  }
+  return (
+    <Section title="Live computer view">
+      {isLive && <DeadlineBar runId={runId} />}
 
-  if (screenshots.length === 0) {
-    return (
-      <Section title="Live computer view">
+      {screenshotsQ.loading && screenshots.length === 0 ? (
+        <div className="text-ink-3 text-[12.5px]">Looking for screenshots…</div>
+      ) : screenshots.length === 0 ? (
         <div className="border-border bg-card text-ink-3 rounded-md border border-dashed px-3 py-6 text-center text-[12.5px]">
           {isLive
             ? "Claude hasn't taken any screenshots yet. They'll appear here as soon as it does."
             : "No screenshots were captured during this run."}
         </div>
-      </Section>
-    )
+      ) : (
+        <div className="border-border bg-card overflow-hidden rounded-lg border">
+          <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-2">
+            <div className="flex gap-1.5">
+              <span className="bg-err size-2.5 rounded-full opacity-60" />
+              <span className="bg-warn size-2.5 rounded-full opacity-60" />
+              <span className="bg-ok size-2.5 rounded-full opacity-60" />
+            </div>
+            <span className="text-ink-3 ml-2 font-mono text-[11px]">
+              {displayed?.path.split("/").pop()}
+            </span>
+            {isLive && (
+              <Badge variant="accent" className="ml-2 gap-1.5">
+                <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
+                {pinned ? "paused" : "live"}
+              </Badge>
+            )}
+            <span className="text-ink-4 ml-auto font-mono text-[11px]">
+              {screenshots.length} frame{screenshots.length === 1 ? "" : "s"}
+            </span>
+            {pinned && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPinned(null)}
+              >
+                Follow latest
+              </Button>
+            )}
+          </div>
+          <div className="bg-background relative aspect-[16/10] w-full">
+            {displayed ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={displayed.path}
+                src={sandboxFileUrl(runId, displayed.path)}
+                alt={`Sandbox screenshot ${displayed.path}`}
+                className="h-full w-full object-contain"
+                loading="lazy"
+              />
+            ) : null}
+          </div>
+          {screenshots.length > 1 && (
+            <div className="border-border flex gap-1.5 overflow-x-auto border-t px-3 py-2">
+              {screenshots.map((s, i) => (
+                <button
+                  key={s.path}
+                  type="button"
+                  onClick={() =>
+                    setPinned(
+                      pinned === s.path
+                        ? null
+                        : i === screenshots.length - 1
+                          ? null
+                          : s.path,
+                    )
+                  }
+                  className={cn(
+                    "border-border relative h-12 w-20 shrink-0 overflow-hidden rounded border bg-black",
+                    displayed?.path === s.path
+                      ? "ring-foreground/60 ring-2"
+                      : "hover:border-ink-4/60",
+                  )}
+                  title={s.path.split("/").pop()}
+                  aria-label={`Open ${s.path}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={sandboxFileUrl(runId, s.path)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <span className="bg-black/60 text-background absolute right-1 bottom-1 rounded px-1 font-mono text-[9px]">
+                    {i + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Section>
+  )
+}
+
+/**
+ * Live deadline strip: shows how much time the sandbox has left and lets
+ * the user add more. Only rendered while the run is in agent2_running.
+ */
+function DeadlineBar({ runId }: { runId: string }) {
+  const statusQ = useFetch(
+    useCallback(() => getSandboxStatus(runId), [runId]),
+    [runId],
+  )
+
+  // Pull the live timeout/elapsed every 5s so the countdown stays
+  // close to reality. The local ticker below interpolates between
+  // those checkpoints.
+  useEffect(() => {
+    const t = setInterval(() => {
+      void statusQ.mutate()
+    }, 5_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusQ.mutate])
+
+  // Local 1-Hz ticker so the countdown actually decrements.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const extend = useMutation(
+    useCallback(
+      async (extra: number) => extendSandboxTimeout(runId, extra),
+      [runId],
+    ),
+  )
+
+  const status: SandboxStatus | undefined = statusQ.data
+  // Best-effort interpolation: subtract local-clock seconds since the
+  // last server snapshot from the server-reported remaining.
+  const lastFetchedAt = useRef<number>(Date.now())
+  useEffect(() => {
+    lastFetchedAt.current = Date.now()
+  }, [status?.remaining_seconds])
+  const interpolated = useMemo(() => {
+    if (!status?.remaining_seconds && status?.remaining_seconds !== 0) return null
+    const sinceFetch = (Date.now() - lastFetchedAt.current) / 1000
+    return Math.max(0, (status.remaining_seconds ?? 0) - sinceFetch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.remaining_seconds, tick])
+
+  const total = status?.timeout_seconds ?? 0
+  const remaining = interpolated ?? 0
+  const elapsedPct =
+    total > 0 ? Math.min(100, Math.max(0, ((total - remaining) / total) * 100)) : 0
+  const isLow = remaining > 0 && remaining < 60
+  const isCritical = remaining > 0 && remaining < 30
+
+  const tone = isCritical ? "err" : isLow ? "warn" : "muted"
+
+  const handleExtend = async (extra: number) => {
+    try {
+      await extend.run(extra)
+      toast.success(`Sandbox got an extra ${extra / 60} min`)
+      await statusQ.mutate()
+    } catch (e) {
+      toast.error(
+        `Could not extend: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
   }
 
+  if (!status) return null
+
   return (
-    <Section title="Live computer view">
-      <div className="border-border bg-card overflow-hidden rounded-lg border">
-        <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-2">
-          <div className="flex gap-1.5">
-            <span className="bg-err size-2.5 rounded-full opacity-60" />
-            <span className="bg-warn size-2.5 rounded-full opacity-60" />
-            <span className="bg-ok size-2.5 rounded-full opacity-60" />
-          </div>
-          <span className="text-ink-3 ml-2 font-mono text-[11px]">
-            {displayed?.path.split("/").pop()}
+    <div
+      className={cn(
+        "mb-3 flex items-center gap-3 rounded-md border px-3 py-2 text-[12.5px]",
+        tone === "err" && "border-err/50 bg-err-soft/40 text-err-ink",
+        tone === "warn" && "border-warn/50 bg-warn-soft/40 text-warn-ink",
+        tone === "muted" && "border-border bg-card text-ink-2",
+      )}
+    >
+      <TimerIcon className="size-[14px] shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">
+            {remaining > 0
+              ? `Sandbox deadline in ${formatRemainingShort(remaining)}`
+              : "Sandbox deadline reached"}
           </span>
-          {isLive && (
-            <Badge variant="accent" className="ml-2 gap-1.5">
-              <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
-              {pinned ? "paused" : "live"}
-            </Badge>
-          )}
-          <span className="text-ink-4 ml-auto font-mono text-[11px]">
-            {screenshots.length} frame{screenshots.length === 1 ? "" : "s"}
-          </span>
-          {pinned && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPinned(null)}
-            >
-              Follow latest
-            </Button>
+          {total > 0 && (
+            <span className="text-ink-4 font-mono text-[11px]">
+              {formatRemainingShort(total - remaining)} / {formatRemainingShort(total)}
+            </span>
           )}
         </div>
-        <div className="bg-background relative aspect-[16/10] w-full">
-          {displayed ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={displayed.path}
-              src={sandboxFileUrl(runId, displayed.path)}
-              alt={`Sandbox screenshot ${displayed.path}`}
-              className="h-full w-full object-contain"
-              loading="lazy"
+        {total > 0 && (
+          <div className="bg-muted mt-1.5 h-1 w-full overflow-hidden rounded">
+            <div
+              className={cn(
+                "h-full transition-all",
+                isCritical
+                  ? "bg-err"
+                  : isLow
+                    ? "bg-warn"
+                    : "bg-foreground/40",
+              )}
+              style={{ width: `${elapsedPct}%` }}
             />
-          ) : null}
-        </div>
-        {screenshots.length > 1 && (
-          <div className="border-border flex gap-1.5 overflow-x-auto border-t px-3 py-2">
-            {screenshots.map((s, i) => (
-              <button
-                key={s.path}
-                type="button"
-                onClick={() =>
-                  setPinned(
-                    pinned === s.path
-                      ? null
-                      : i === screenshots.length - 1
-                        ? null
-                        : s.path,
-                  )
-                }
-                className={cn(
-                  "border-border relative h-12 w-20 shrink-0 overflow-hidden rounded border bg-black",
-                  displayed?.path === s.path
-                    ? "ring-foreground/60 ring-2"
-                    : "hover:border-ink-4/60",
-                )}
-                title={s.path.split("/").pop()}
-                aria-label={`Open ${s.path}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={sandboxFileUrl(runId, s.path)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-                <span className="bg-black/60 text-background absolute right-1 bottom-1 rounded px-1 font-mono text-[9px]">
-                  {i + 1}
-                </span>
-              </button>
-            ))}
           </div>
         )}
       </div>
-    </Section>
+      <Button
+        variant={isLow ? "accent" : "ghost"}
+        size="sm"
+        disabled={extend.loading}
+        onClick={() => handleExtend(180)}
+      >
+        <RefreshCwIcon className="size-[12px]" />
+        {extend.loading ? "Extending…" : "+3 min"}
+      </Button>
+    </div>
   )
+}
+
+function formatRemainingShort(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds))
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  if (r === 0) return `${m}m`
+  return `${m}m ${r}s`
 }

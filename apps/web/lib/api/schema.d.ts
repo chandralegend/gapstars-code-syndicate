@@ -342,6 +342,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/sandbox/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sandbox Status
+         * @description Live status of the sandbox task backing this run.
+         *
+         *     Includes timeout / elapsed / remaining seconds so the frontend can
+         *     show a deadline countdown and offer to extend.
+         */
+        get: operations["get_sandbox_status_api_runs__run_id__sandbox_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/sandbox/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend Sandbox Timeout
+         * @description Give the sandbox more time to finish.
+         *
+         *     Bumps the underlying sandbox task's ``timeout_seconds``. The runner
+         *     re-reads the value on its next 2-second tick, so the change is live.
+         *     Emits an ``agent_event`` so the frontend timeline reflects the
+         *     extension.
+         */
+        post: operations["extend_sandbox_timeout_api_runs__run_id__sandbox_extend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -394,6 +442,26 @@ export interface components {
             content: string;
             /** Agent */
             agent?: string | null;
+        };
+        /** ExtendRequest */
+        ExtendRequest: {
+            /**
+             * Extra Seconds
+             * @description How many seconds to add to the sandbox's timeout budget.
+             * @default 180
+             */
+            extra_seconds: number;
+        };
+        /** ExtendResponse */
+        ExtendResponse: {
+            /** Task Id */
+            task_id: string;
+            /** Previous Timeout Seconds */
+            previous_timeout_seconds: number;
+            /** Timeout Seconds */
+            timeout_seconds: number;
+            /** Added Seconds */
+            added_seconds: number;
         };
         /** FeatureExpectationRead */
         FeatureExpectationRead: {
@@ -615,6 +683,25 @@ export interface components {
             count: number;
             /** Screenshots */
             screenshots: components["schemas"]["SandboxScreenshot"][];
+        };
+        /** SandboxStatus */
+        SandboxStatus: {
+            /** Task Id */
+            task_id: string;
+            /** Status */
+            status: string;
+            /** Error */
+            error: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
+            /** Elapsed Seconds */
+            elapsed_seconds?: number | null;
+            /** Remaining Seconds */
+            remaining_seconds?: number | null;
         };
         /**
          * TestCaseCategory
@@ -1475,6 +1562,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sandbox_status_api_runs__run_id__sandbox_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extend_sandbox_timeout_api_runs__run_id__sandbox_extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtendResponse"];
                 };
             };
             /** @description Validation Error */

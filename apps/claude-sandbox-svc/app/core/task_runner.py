@@ -164,43 +164,77 @@ class TaskRunner:
                 task.container_name = started.container_name
                 task.vnc_port = started.vnc_port
 
-        # Wait for completion or timeout/cancel
+        # Wait for completion or timeout/cancel.
+        #
+        # The timeout is enforced by a polling loop that re-reads
+        # ``task.timeout_seconds`` from the DB on every tick. This means a
+        # client can extend the deadline mid-run by ``PATCH /tasks/{id}``
+        # to bump ``timeout_seconds``, and we'll honour the new value
+        # without needing to restart anything.
         wait_task = asyncio.create_task(
             asyncio.to_thread(docker_manager.wait_sandbox, started.container_id)
         )
         cancel_task = asyncio.create_task(cancel_event.wait())
-        timeout_task = asyncio.create_task(asyncio.sleep(timeout))
 
-        done, pending = await asyncio.wait(
-            {wait_task, cancel_task, timeout_task}, return_when=asyncio.FIRST_COMPLETED
-        )
-
+        started_at = asyncio.get_event_loop().time()
         outcome: TaskStatus
         exit_code: int | None = None
         error: str | None = None
+        effective_timeout = timeout
 
-        if wait_task in done:
-            try:
-                wait_result = wait_task.result()
-                exit_code = int(wait_result.get("StatusCode", -1))
-                outcome = TaskStatus.SUCCEEDED if exit_code == 0 else TaskStatus.FAILED
-                if outcome == TaskStatus.FAILED:
-                    error = f"sandbox exited with code {exit_code}"
-            except Exception as exc:
-                outcome = TaskStatus.FAILED
-                error = f"wait error: {exc}"
-        elif cancel_task in done:
-            outcome = TaskStatus.CANCELLED
-            error = "cancelled by user"
-            await asyncio.to_thread(docker_manager.stop_sandbox, started.container_id)
-        else:  # timeout
-            outcome = TaskStatus.TIMEOUT
-            error = f"exceeded timeout of {timeout}s"
-            await asyncio.to_thread(docker_manager.stop_sandbox, started.container_id)
+        # Tick every 2s — fast enough for a snappy UX, slow enough not to
+        # hammer the DB.
+        TIMEOUT_TICK = 2.0
+
+        while True:
+            tick = asyncio.create_task(asyncio.sleep(TIMEOUT_TICK))
+            done, _pending = await asyncio.wait(
+                {wait_task, cancel_task, tick},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            tick.cancel()
+
+            if wait_task in done:
+                try:
+                    wait_result = wait_task.result()
+                    exit_code = int(wait_result.get("StatusCode", -1))
+                    outcome = (
+                        TaskStatus.SUCCEEDED if exit_code == 0 else TaskStatus.FAILED
+                    )
+                    if outcome == TaskStatus.FAILED:
+                        error = f"sandbox exited with code {exit_code}"
+                except Exception as exc:
+                    outcome = TaskStatus.FAILED
+                    error = f"wait error: {exc}"
+                break
+
+            if cancel_task in done:
+                outcome = TaskStatus.CANCELLED
+                error = "cancelled by user"
+                await asyncio.to_thread(
+                    docker_manager.stop_sandbox, started.container_id
+                )
+                break
+
+            # Re-read the live timeout in case it was extended.
+            with session_scope() as db:
+                row = db.get(Task, task_id)
+                if row is not None:
+                    effective_timeout = row.timeout_seconds
+
+            elapsed = asyncio.get_event_loop().time() - started_at
+            if elapsed >= effective_timeout:
+                outcome = TaskStatus.TIMEOUT
+                error = f"exceeded timeout of {int(effective_timeout)}s"
+                await asyncio.to_thread(
+                    docker_manager.stop_sandbox, started.container_id
+                )
+                break
 
         # Cancel pending watchers
-        for t in pending:
-            t.cancel()
+        for t in (wait_task, cancel_task):
+            if not t.done():
+                t.cancel()
 
         # Capture logs before removing the container
         try:
