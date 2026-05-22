@@ -1,5 +1,18 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
+export type ProjectStatus = "active" | "draft" | "archived"
+
+export interface Project {
+  id: string
+  name: string
+  description: string
+  stagingUrl: string
+  testsetCount: number
+  runsThisWeek: number
+  status: ProjectStatus
+  createdAt: string
+}
+
 export type NodeStatus = "idle" | "running" | "done" | "err" | "wait"
 
 export interface AgentNode {
