@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation"
 import {
   AlertTriangleIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  FileTextIcon,
   RefreshCwIcon,
   SendIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { CapLine } from "@/components/probe/cap-line"
+import { RelativeTime, formatAbsolute, formatDuration } from "@/lib/format"
+import { RunStatusBadge } from "@/components/probe/run-status-badge"
 import { StatusDot } from "@/components/probe/status-dot"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,17 +28,32 @@ import {
 } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  caseCategoryBadge,
+  caseCategoryTitle,
+  caseStatusLabel,
+  eventLabel,
+  nodeLabel,
+  nodeOrderIndex,
+  nodePhase,
+  runPhaseTitle,
+  runStatusDot,
+  runStatusTone,
+} from "@/lib/labels"
+import {
   getFeatureExpectation,
   getProject,
   getRun,
   getTestCases,
   getTestScenario,
+  listSandboxFiles,
+  readSandboxFile,
   runEventsUrl,
   submitFeedback,
   useFetch,
   useMutation,
   type FeatureExpectation,
   type Run,
+  type SandboxFileList,
   type TestCase,
 } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
@@ -47,6 +68,26 @@ interface SseEvent {
 }
 
 const TERMINAL_STATUSES = new Set(["completed", "failed"])
+
+const PHASE_ORDER = [
+  "Setup",
+  "Brief",
+  "Sandbox",
+  "Test cases",
+  "Saving",
+] as const
+
+function findPhaseIndex(status: string | undefined, currentNode: string | null | undefined): number {
+  if (!status) return 0
+  if (status === "agent1_running" || status === "agent1_review") return 1
+  if (status === "agent2_running") return 2
+  if (status === "agent3_running" || status === "agent3_review") return 3
+  if (status === "completed" || status === "failed") return 4
+  if (currentNode) {
+    return PHASE_ORDER.indexOf(nodePhase(currentNode) as (typeof PHASE_ORDER)[number])
+  }
+  return 0
+}
 
 export default function ProjectRunDetailPage({
   params,
@@ -77,10 +118,8 @@ export default function ProjectRunDetailPage({
     }
   }, [runId])
 
-  // Initial run fetch + then poll every 4s as a safety net (SSE handles
-  // most updates, but the run row's status changes between events)
   useEffect(() => {
-    void refreshRun()
+    void refreshRun().catch(() => undefined)
     const t = setInterval(() => {
       if (run && TERMINAL_STATUSES.has(run.status)) return
       void refreshRun().catch(() => undefined)
@@ -89,7 +128,6 @@ export default function ProjectRunDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshRun, run?.status])
 
-  // Test scenario for breadcrumb context
   const scenarioQ = useFetch(
     useCallback(
       async () =>
@@ -100,7 +138,7 @@ export default function ProjectRunDetailPage({
   )
 
   const project = projectQ.data
-  const scenario = scenarioQ.data
+  const scenario = scenarioQ.data ?? null
 
   useSetBreadcrumbs(
     project
@@ -108,7 +146,7 @@ export default function ProjectRunDetailPage({
           { label: "Projects", href: "/projects" },
           { label: project.name, href: `/projects/${project.id}` },
           {
-            label: "Test sets",
+            label: "Feature tests",
             href: `/projects/${project.id}/testsets`,
             muted: true,
           },
@@ -121,13 +159,18 @@ export default function ProjectRunDetailPage({
                 },
               ]
             : []),
-          { label: runId.slice(0, 8), mono: true },
+          { label: `Run #${runId.slice(0, 8)}`, mono: true },
         ]
       : [{ label: "Projects", href: "/projects" }],
     "run",
+    scenario
+      ? {
+          openTestHref: `/projects/${projectId}/testsets/${scenario.id}`,
+        }
+      : undefined,
   )
 
-  // ── SSE: live event tail ─────────────────────────────────────────────────
+  // ── SSE ──────────────────────────────────────────────────────────────────
 
   const [events, setEvents] = useState<SseEvent[]>([])
   const eventIdsRef = useRef<Set<string>>(new Set())
@@ -139,10 +182,10 @@ export default function ProjectRunDetailPage({
     const url = runEventsUrl(runId)
     const es = new EventSource(url)
 
-    const onMessage = (kind: string) => (e: MessageEvent) => {
+    const handle = (kind: string) => (e: MessageEvent) => {
       try {
         const parsed = JSON.parse(e.data) as Record<string, unknown>
-        const id = typeof parsed.id === "string" ? parsed.id : `${Date.now()}`
+        const id = typeof parsed.id === "string" ? parsed.id : `${Date.now()}-${kind}`
         if (eventIdsRef.current.has(id)) return
         eventIdsRef.current.add(id)
         setEvents((prev) => [
@@ -177,18 +220,16 @@ export default function ProjectRunDetailPage({
       "error",
       "done",
     ]
-    types.forEach((t) => es.addEventListener(t, onMessage(t)))
-
+    types.forEach((t) => es.addEventListener(t, handle(t)))
     es.onerror = () => {
-      // Browser will retry automatically; no-op.
+      // Browser auto-retries; nothing to do.
     }
-
     return () => {
       es.close()
     }
   }, [runId, refreshRun])
 
-  // ── Conditional sub-fetches based on run status ─────────────────────────
+  // ── Conditional sub-fetches ──────────────────────────────────────────────
 
   const showFE =
     !!run &&
@@ -217,7 +258,13 @@ export default function ProjectRunDetailPage({
     [showCases, runId, events.length],
   )
 
-  // ── Feedback submission ─────────────────────────────────────────────────
+  // Sandbox tab visible once the very first sandbox event has fired.
+  const sandboxStarted = useMemo(
+    () => events.some((e) => e.type === "sandbox_task_created"),
+    [events],
+  )
+
+  // ── Feedback ─────────────────────────────────────────────────────────────
 
   const [feedbackText, setFeedbackText] = useState("")
   const feedback = useMutation(
@@ -235,20 +282,20 @@ export default function ProjectRunDetailPage({
 
   const submit = async (decision: "approve" | "revise") => {
     if (decision === "revise" && !feedbackText.trim()) {
-      toast.error("Please provide feedback when requesting a revision.")
+      toast.error("Please describe what should change.")
       return
     }
     try {
       await feedback.run(decision)
-      toast.success(decision === "approve" ? "Approved" : "Revision requested")
+      toast.success(decision === "approve" ? "Approved" : "Changes requested")
       setFeedbackText("")
       await refreshRun()
     } catch (e) {
-      toast.error(`Feedback failed: ${e instanceof Error ? e.message : e}`)
+      toast.error(`Could not submit: ${e instanceof Error ? e.message : e}`)
     }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────
 
   if (projectQ.error) {
     return (
@@ -263,7 +310,7 @@ export default function ProjectRunDetailPage({
   }
 
   return (
-    <div className="grid h-full grid-cols-[420px_minmax(0,1fr)] overflow-hidden">
+    <div className="grid h-full grid-cols-[440px_minmax(0,1fr)] overflow-hidden">
       <aside className="border-border min-w-0 overflow-auto border-r">
         <Timeline
           run={run}
@@ -278,8 +325,10 @@ export default function ProjectRunDetailPage({
       <section className="min-w-0 overflow-hidden">
         <RightPanel
           run={run}
+          runId={runId}
           fe={feQ.data ?? undefined}
           cases={casesQ.data ?? []}
+          sandboxStarted={sandboxStarted}
           feedbackText={feedbackText}
           onFeedbackTextChange={setFeedbackText}
           onSubmit={submit}
@@ -291,6 +340,93 @@ export default function ProjectRunDetailPage({
 }
 
 /* ────────────────────────────  Timeline  ──────────────────────────── */
+
+interface NodeBucket {
+  node_name: string
+  events: SseEvent[]
+  isInterrupt: boolean
+  isError: boolean
+  startedAt?: string
+  endedAt?: string
+  /** For sandbox bucket, the latest progress status */
+  sandboxStatus?: string
+}
+
+function bucketEvents(events: SseEvent[]): NodeBucket[] {
+  const map = new Map<string, NodeBucket>()
+  for (const e of events) {
+    if (e.type === "done") continue
+    let key = e.node_name
+    // Sandbox events are emitted from the agent_2_placeholder node already,
+    // so they naturally bucket together.
+    if (!map.has(key)) {
+      map.set(key, {
+        node_name: key,
+        events: [],
+        isInterrupt: false,
+        isError: false,
+      })
+    }
+    const bucket = map.get(key)!
+    bucket.events.push(e)
+    if (e.type === "node_start") bucket.startedAt = e.created_at
+    if (e.type === "node_end") bucket.endedAt = e.created_at
+    if (e.type === "interrupt") bucket.isInterrupt = true
+    if (e.type === "feedback_received") bucket.isInterrupt = false
+    if (e.type === "error" || e.type === "sandbox_task_failed")
+      bucket.isError = true
+    if (e.type === "sandbox_task_progress") {
+      const p = e.payload as Record<string, unknown> | null | undefined
+      if (p && typeof p.status === "string") bucket.sandboxStatus = p.status
+    }
+    if (e.type === "sandbox_task_completed") bucket.sandboxStatus = "succeeded"
+    if (e.type === "sandbox_task_failed") bucket.sandboxStatus = "failed"
+  }
+
+  const out = [...map.values()]
+  out.sort((a, b) => {
+    const ai = nodeOrderIndex(a.node_name)
+    const bi = nodeOrderIndex(b.node_name)
+    if (ai !== bi) return ai - bi
+    const at = a.events[0]?.created_at ?? ""
+    const bt = b.events[0]?.created_at ?? ""
+    return at.localeCompare(bt)
+  })
+  return out
+}
+
+function bucketStatus(
+  bucket: NodeBucket,
+  runStatus: string | undefined,
+): { label: string; tone: "ok" | "warn" | "err" | "accent" | "muted"; dot: "running" | "done" | "err" | "wait" } {
+  if (bucket.isError) {
+    return { label: "Failed", tone: "err", dot: "err" }
+  }
+  if (bucket.isInterrupt && !TERMINAL_STATUSES.has(runStatus ?? "")) {
+    return { label: "Awaiting your review", tone: "warn", dot: "wait" }
+  }
+  if (bucket.endedAt) {
+    let label = "Done"
+    if (bucket.startedAt && bucket.endedAt) {
+      const d = Date.parse(bucket.endedAt) - Date.parse(bucket.startedAt)
+      if (Number.isFinite(d) && d >= 0) label = `Done in ${formatDuration(d)}`
+    }
+    return { label, tone: "ok", dot: "done" }
+  }
+  // Sandbox-specific running cues
+  if (bucket.sandboxStatus) {
+    const s = bucket.sandboxStatus
+    if (s === "succeeded")
+      return { label: "Done", tone: "ok", dot: "done" }
+    if (s === "failed" || s === "cancelled" || s === "timeout")
+      return { label: `Sandbox ${s}`, tone: "err", dot: "err" }
+    return { label: `Sandbox ${s}`, tone: "accent", dot: "running" }
+  }
+  if (bucket.startedAt) {
+    return { label: "Running", tone: "accent", dot: "running" }
+  }
+  return { label: "Queued", tone: "muted", dot: "wait" }
+}
 
 function Timeline({
   run,
@@ -306,22 +442,26 @@ function Timeline({
   runId: string
 }) {
   const status = run?.status ?? "pending"
+  const buckets = useMemo(() => bucketEvents(events), [events])
+  const phaseIndex = findPhaseIndex(status, run?.current_node)
+
   return (
     <div className="px-5 py-5">
       <div className="border-border bg-card mb-5 space-y-1.5 rounded-lg border p-4">
         <Row label="Run">
-          <span className="font-mono">{runId.slice(0, 8)}</span>
+          <span className="font-mono">#{runId.slice(0, 8)}</span>
           <span className="ml-auto">
             <RunStatusBadge status={status} />
           </span>
         </Row>
-        <Row label="Node">
-          <span className="font-mono">{run?.current_node ?? "—"}</span>
-        </Row>
-        <Row label="Created">
-          <span className="font-mono">
-            {run ? new Date(run.created_at).toLocaleString() : "—"}
+        <Row label="Phase">
+          <span className="font-medium">{runPhaseTitle(status)}</span>
+          <span className="text-ink-4 ml-auto font-mono text-[11px]">
+            {Math.min(phaseIndex + 1, PHASE_ORDER.length)} of {PHASE_ORDER.length}
           </span>
+        </Row>
+        <Row label="Started">
+          <RelativeTime iso={run?.created_at} />
         </Row>
         {run?.error && (
           <div className="border-err/40 bg-err-soft text-err-ink mt-2 rounded-md border p-2 text-[12px]">
@@ -330,28 +470,119 @@ function Timeline({
         )}
         {runError && (
           <div className="border-err/40 bg-err-soft text-err-ink mt-2 rounded-md border p-2 text-[12px]">
-            Failed to load run: {runError.message}
+            Could not load run: {runError.message}
           </div>
         )}
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <CapLine>orchestration timeline</CapLine>
+        <CapLine>orchestration steps</CapLine>
         <Button variant="ghost" size="sm" onClick={() => void onRefresh()}>
           <RefreshCwIcon className="size-[12px]" />
           Refresh
         </Button>
       </div>
 
-      <div className="space-y-1.5">
-        {events.length === 0 ? (
+      <div className="space-y-2">
+        {buckets.length === 0 ? (
           <div className="text-ink-3 px-1 text-[12.5px]">
-            Waiting for events…
+            The orchestration just started. The first event will arrive in a
+            few seconds…
           </div>
         ) : (
-          events.map((e) => <EventRow key={e.id} e={e} />)
+          buckets.map((b) => (
+            <NodeCard key={b.node_name} bucket={b} runStatus={run?.status} />
+          ))
         )}
       </div>
+    </div>
+  )
+}
+
+function NodeCard({
+  bucket,
+  runStatus,
+}: {
+  bucket: NodeBucket
+  runStatus: string | undefined
+}) {
+  const [open, setOpen] = useState(false)
+  const status = bucketStatus(bucket, runStatus)
+  const eventCount = bucket.events.length
+  return (
+    <div
+      className={cn(
+        "rounded-md border px-3 py-2.5",
+        status.tone === "err" && "border-err/40 bg-err-soft/30",
+        status.tone === "warn" && "border-warn/40 bg-warn-soft/30",
+        status.tone === "accent" && "border-accent/40 bg-accent-soft/30",
+        status.tone === "ok" && "border-ok/30 bg-card",
+        status.tone === "muted" && "border-border bg-card",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <StatusDot kind={status.dot} size={6} />
+        <div className="text-[13px] font-medium">
+          {nodeLabel(bucket.node_name)}
+        </div>
+        <Badge
+          variant={status.tone === "muted" ? "muted" : status.tone}
+          className="ml-auto"
+        >
+          {status.label}
+        </Badge>
+      </div>
+      <div className="text-ink-4 mt-1 flex items-center gap-2 text-[11px]">
+        <span>{nodePhase(bucket.node_name)}</span>
+        {bucket.startedAt && (
+          <>
+            <span>·</span>
+            <RelativeTime iso={bucket.startedAt} />
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="text-ink-3 hover:text-foreground ml-auto inline-flex items-center gap-0.5 text-[11px]"
+        >
+          {open ? (
+            <ChevronDownIcon className="size-[11px]" />
+          ) : (
+            <ChevronRightIcon className="size-[11px]" />
+          )}
+          {eventCount} event{eventCount === 1 ? "" : "s"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="border-border mt-2 space-y-1 border-t pt-2">
+          {bucket.events.map((e) => (
+            <EventLine key={e.id} e={e} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EventLine({ e }: { e: SseEvent }) {
+  return (
+    <div className="text-[11.5px] leading-snug">
+      <div className="flex items-center gap-2">
+        <span className="bg-muted text-ink-3 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+          {eventLabel(e.type)}
+        </span>
+        <span className="text-ink-4 ml-auto font-mono text-[10.5px]">
+          <RelativeTime iso={e.created_at} />
+        </span>
+      </div>
+      {e.payload != null && (
+        <pre className="text-ink-3 mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[11px]">
+          {typeof e.payload === "string"
+            ? e.payload
+            : JSON.stringify(e.payload, null, 0)}
+        </pre>
+      )}
     </div>
   )
 }
@@ -371,84 +602,24 @@ function Row({
   )
 }
 
-function RunStatusBadge({ status }: { status: string }) {
-  const variant =
-    status === "completed"
-      ? "ok"
-      : status === "failed"
-        ? "err"
-        : status.endsWith("_review")
-          ? "warn"
-          : "accent"
-  const dotKind: "running" | "done" | "err" | "wait" =
-    status === "completed"
-      ? "done"
-      : status === "failed"
-        ? "err"
-        : status.endsWith("_review")
-          ? "wait"
-          : "running"
-  return (
-    <Badge variant={variant} className="gap-1.5">
-      <StatusDot kind={dotKind} size={6} />
-      {status.replace(/_/g, " ")}
-    </Badge>
-  )
-}
-
-function EventRow({ e }: { e: SseEvent }) {
-  const time = new Date(e.created_at).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-  const tone =
-    e.type === "error" || e.type === "sandbox_task_failed"
-      ? "border-err/40 bg-err-soft/40"
-      : e.type === "interrupt"
-        ? "border-warn/40 bg-warn-soft/40"
-        : e.type === "node_end" ||
-            e.type === "workflow_completed" ||
-            e.type === "sandbox_task_completed" ||
-            e.type === "feedback_received"
-          ? "border-ok/30 bg-ok-soft/30"
-          : "border-border bg-card"
-  return (
-    <div className={cn("rounded-md border px-3 py-2 text-[12.5px]", tone)}>
-      <div className="flex items-center gap-2">
-        <span className="bg-muted text-ink-3 rounded-[3px] px-1.5 py-px font-mono text-[10.5px]">
-          {e.type}
-        </span>
-        <span className="text-ink-3 font-mono text-[11px]">{e.node_name}</span>
-        <span className="text-ink-4 ml-auto font-mono text-[10.5px]">
-          {time}
-        </span>
-      </div>
-      {e.payload != null && (
-        <pre className="text-ink-2 mt-1.5 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-snug">
-          {typeof e.payload === "string"
-            ? e.payload
-            : JSON.stringify(e.payload, null, 0)}
-        </pre>
-      )}
-    </div>
-  )
-}
-
 /* ────────────────────────────  Right panel  ──────────────────────────── */
 
 function RightPanel({
   run,
+  runId,
   fe,
   cases,
+  sandboxStarted,
   feedbackText,
   onFeedbackTextChange,
   onSubmit,
   submitting,
 }: {
   run: Run | undefined
+  runId: string
   fe: FeatureExpectation | undefined
   cases: TestCase[]
+  sandboxStarted: boolean
   feedbackText: string
   onFeedbackTextChange: (s: string) => void
   onSubmit: (decision: "approve" | "revise") => void
@@ -456,33 +627,27 @@ function RightPanel({
 }) {
   const status = run?.status ?? "pending"
   const showReviewBar = status === "agent1_review" || status === "agent3_review"
+  const reviewKind: "brief" | "cases" =
+    status === "agent3_review" ? "cases" : "brief"
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-border flex items-center gap-3 border-b px-6 py-3.5">
-        <div className="text-[14px] font-medium">
-          {status === "agent1_review"
-            ? "Review feature expectation"
-            : status === "agent3_review"
-              ? "Review test cases"
-              : status === "completed"
-                ? "Run completed"
-                : status === "failed"
-                  ? "Run failed"
-                  : "Run in progress"}
+        <div>
+          <div className="text-[15px] font-semibold">{runPhaseTitle(status)}</div>
+          <div className="text-ink-3 text-[12px]">
+            {run?.current_node ? nodeLabel(run.current_node) : "Run details"}
+          </div>
         </div>
-        <span className="text-ink-3 text-[12px]">
-          {run?.current_node ?? ""}
-        </span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
         <Tabs
-          defaultValue={status === "agent3_review" ? "cases" : "spec"}
+          defaultValue={status === "agent3_review" ? "cases" : "brief"}
           className="flex min-h-0 flex-1 flex-col"
         >
           <TabsList className="border-border h-auto justify-start gap-1 rounded-none border-b bg-transparent px-6 py-0">
-            <Tab value="spec">Feature spec {fe ? `· v${fe.version}` : ""}</Tab>
+            <Tab value="brief">Brief {fe ? `· v${fe.version}` : ""}</Tab>
             <Tab value="cases">
               Test cases
               {cases.length > 0 && (
@@ -491,16 +656,19 @@ function RightPanel({
                 </span>
               )}
             </Tab>
+            {sandboxStarted && (
+              <Tab value="sandbox">Sandbox activity</Tab>
+            )}
           </TabsList>
 
-          <TabsContent value="spec" className="px-6 py-5">
+          <TabsContent value="brief" className="px-6 py-5">
             {fe ? (
               <FeaturePanel fe={fe} />
             ) : (
               <div className="text-ink-3 text-[13px]">
                 {showReviewBar
-                  ? "Loading feature expectation…"
-                  : "The feature expectation will appear here once Agent 1 finishes."}
+                  ? "Loading the brief…"
+                  : "The brief will appear here once Agent 1 finishes drafting it."}
               </div>
             )}
           </TabsContent>
@@ -512,10 +680,16 @@ function RightPanel({
               <div className="text-ink-3 text-[13px]">
                 {status === "completed" || status === "agent3_review"
                   ? "No test cases yet."
-                  : "Test cases will appear once Agent 3 produces them."}
+                  : "Test cases will appear once Agent 3 generates them."}
               </div>
             )}
           </TabsContent>
+
+          {sandboxStarted && (
+            <TabsContent value="sandbox" className="px-6 py-5">
+              <SandboxPanel runId={runId} runStatus={status} />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -523,21 +697,17 @@ function RightPanel({
         <div className="border-warn/40 bg-warn-soft/40 space-y-2 border-t px-6 py-3.5">
           <div className="text-warn-ink flex items-center gap-1.5 text-[12px] font-medium">
             <AlertTriangleIcon className="size-[12px]" />
-            Human review required · run is paused on this node
+            This run is paused. Review the {reviewKind === "brief" ? "brief" : "test cases"} above and approve or request changes.
           </div>
           <Textarea
-            placeholder={
-              status === "agent1_review"
-                ? "Optional feedback for Agent 1 — required if you choose 'Revise'."
-                : "Optional feedback for Agent 3 — required if you choose 'Revise'."
-            }
+            placeholder="Tell the agent what to change (only required if you request changes)."
             value={feedbackText}
             onChange={(e) => onFeedbackTextChange(e.target.value)}
             className="min-h-[60px] resize-none text-[13px]"
           />
           <div className="flex items-center gap-2">
             <span className="text-ink-4 text-[11px]">
-              ⌘↵ to accept · esc to discard edits
+              Approve to continue · Request changes will loop the agent back
             </span>
             <div className="ml-auto flex gap-2">
               <Button
@@ -547,7 +717,7 @@ function RightPanel({
                 onClick={() => onSubmit("revise")}
               >
                 <SendIcon className="size-[13px]" />
-                Send revision
+                Request changes
               </Button>
               <Button
                 variant="accent"
@@ -583,7 +753,7 @@ function Tab({
   )
 }
 
-/* ────────────────────────  FE & cases panels  ──────────────────────── */
+/* ────────────────────────  Brief & cases  ──────────────────────── */
 
 function FeaturePanel({ fe }: { fe: FeatureExpectation }) {
   const c = (fe.content ?? {}) as Record<string, unknown>
@@ -591,18 +761,18 @@ function FeaturePanel({ fe }: { fe: FeatureExpectation }) {
     <div className="max-w-[820px] space-y-5">
       <div>
         <Badge variant={fe.status === "approved" ? "ok" : "muted"}>
-          {fe.status} · v{fe.version}
+          {fe.status === "approved" ? "Approved" : fe.status === "rejected" ? "Needs changes" : "Draft"} · v{fe.version}
         </Badge>
       </div>
       {typeof c.feature_overview === "string" && (
-        <Section title="Feature overview">
+        <Section title="What this feature does">
           <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
             {c.feature_overview}
           </p>
         </Section>
       )}
       {Array.isArray(c.user_flows) && c.user_flows.length > 0 && (
-        <Section title="User flows">
+        <Section title="How users interact with it">
           <ul className="space-y-3 text-[13.5px]">
             {(c.user_flows as Array<Record<string, unknown>>).map((f, i) => (
               <li key={i} className="border-border bg-card rounded-md border p-3">
@@ -625,14 +795,14 @@ function FeaturePanel({ fe }: { fe: FeatureExpectation }) {
         </Section>
       )}
       {typeof c.data_contracts === "string" && (
-        <Section title="Data contracts">
+        <Section title="Inputs and outputs">
           <pre className="bg-muted whitespace-pre-wrap rounded-md p-3 font-mono text-[12px] leading-snug">
             {c.data_contracts}
           </pre>
         </Section>
       )}
       {Array.isArray(c.edge_cases) && (
-        <Section title="Edge cases">
+        <Section title="Edge cases to consider">
           <ul className="list-disc space-y-1 pl-5 text-[13.5px]">
             {(c.edge_cases as unknown[]).map((s, i) => (
               <li key={i}>{String(s)}</li>
@@ -641,7 +811,7 @@ function FeaturePanel({ fe }: { fe: FeatureExpectation }) {
         </Section>
       )}
       {Array.isArray(c.expanded_acceptance_criteria) && (
-        <Section title="Acceptance criteria">
+        <Section title="What needs to be true to pass">
           <div className="space-y-2">
             {(c.expanded_acceptance_criteria as unknown[]).map((t, i) => (
               <div
@@ -658,7 +828,7 @@ function FeaturePanel({ fe }: { fe: FeatureExpectation }) {
         </Section>
       )}
       {Array.isArray(c.dependencies_and_assumptions) && (
-        <Section title="Dependencies & assumptions">
+        <Section title="What we're assuming">
           <ul className="list-disc space-y-1 pl-5 text-[13.5px]">
             {(c.dependencies_and_assumptions as unknown[]).map((s, i) => (
               <li key={i}>{String(s)}</li>
@@ -699,8 +869,13 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
         return (
           <section key={kind}>
             <div className="mb-2 flex items-center gap-2">
-              <h3 className="text-[15px] font-semibold capitalize">{kind}</h3>
+              <h3 className="text-[15px] font-semibold">
+                {caseCategoryBadge(kind)}
+              </h3>
               <Badge variant="muted">{items.length}</Badge>
+              <span className="text-ink-3 text-[12px]">
+                {caseCategoryTitle(kind)}
+              </span>
             </div>
             <div className="space-y-2">
               {items.map((tc) => (
@@ -723,7 +898,7 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                       }
                       className="ml-auto"
                     >
-                      {tc.status}
+                      {caseStatusLabel(tc.status)}
                     </Badge>
                   </div>
                   <p className="text-ink-3 mt-1 text-[12.5px]">
@@ -731,7 +906,7 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                   </p>
                   {tc.preconditions && (
                     <div className="text-ink-4 mt-1 text-[12px]">
-                      Preconditions: {tc.preconditions}
+                      Before you start: {tc.preconditions}
                     </div>
                   )}
                   {Array.isArray(tc.steps) && tc.steps.length > 0 && (
@@ -755,7 +930,7 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                   </div>
                   {tc.rationale && (
                     <div className="text-ink-4 mt-1 text-[12px]">
-                      Rationale: {tc.rationale}
+                      Why it matters: {tc.rationale}
                     </div>
                   )}
                 </div>
@@ -780,5 +955,321 @@ function Section({
       <CapLine className="mb-2">{title}</CapLine>
       <div>{children}</div>
     </section>
+  )
+}
+
+/* ────────────────────────────  Sandbox panel  ──────────────────────────── */
+
+interface ParsedTraceLine {
+  ts?: string
+  kind?: string
+  text?: string
+  name?: string
+  status_code?: number
+  raw: string
+}
+
+function parseTraceLines(text: string): ParsedTraceLine[] {
+  return text
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((line) => {
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>
+        return {
+          ts: typeof obj.ts === "string" ? obj.ts : undefined,
+          kind: typeof obj.kind === "string" ? obj.kind : undefined,
+          text:
+            typeof obj.text === "string"
+              ? obj.text
+              : typeof obj.output === "string"
+                ? (obj.output as string)
+                : undefined,
+          name: typeof obj.name === "string" ? obj.name : undefined,
+          status_code:
+            typeof obj.status_code === "number" ? obj.status_code : undefined,
+          raw: line,
+        }
+      } catch {
+        return { raw: line } as ParsedTraceLine
+      }
+    })
+}
+
+interface ParsedEventLine {
+  ts?: string
+  kind?: string
+  msg?: string
+  raw: string
+}
+
+function parseEventsLines(text: string): ParsedEventLine[] {
+  return text
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((line) => {
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>
+        return {
+          ts: typeof obj.ts === "string" ? obj.ts : undefined,
+          kind: typeof obj.kind === "string" ? obj.kind : undefined,
+          msg: typeof obj.msg === "string" ? obj.msg : undefined,
+          raw: line,
+        }
+      } catch {
+        return { raw: line } as ParsedEventLine
+      }
+    })
+}
+
+const TRACE_KIND_LABEL: Record<string, string> = {
+  run_start: "Run started",
+  api_response: "API response",
+  assistant_text: "Assistant said",
+  thinking: "Thinking",
+  tool_use: "Tool used",
+  tool_result: "Tool result",
+  run_end: "Run ended",
+  run_error: "Run errored",
+}
+
+function SandboxPanel({
+  runId,
+  runStatus,
+}: {
+  runId: string
+  runStatus: string
+}) {
+  const filesQ = useFetch(
+    useCallback(() => listSandboxFiles(runId), [runId]),
+    [runId],
+  )
+
+  // Poll while sandbox is still running.
+  useEffect(() => {
+    if (runStatus !== "agent2_running") return
+    const t = setInterval(() => {
+      void filesQ.mutate()
+    }, 5_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runStatus, filesQ.mutate])
+
+  if (filesQ.error) {
+    return (
+      <div className="text-ink-3 text-[13px]">
+        Could not list sandbox files: {filesQ.error.message}
+      </div>
+    )
+  }
+
+  const list: SandboxFileList | undefined = filesQ.data
+  if (!list) {
+    return <div className="text-ink-3 text-[13px]">Loading sandbox files…</div>
+  }
+
+  const findings = list.files.find(
+    (f) => f.path === "output/workspace/findings.md",
+  )
+  const events = list.files.find(
+    (f) => f.path === "output/workspace/events.jsonl",
+  )
+  const trace = list.files.find((f) => f.path === "output/trace.jsonl")
+  const others = list.files.filter(
+    (f) =>
+      f.path !== "output/workspace/findings.md" &&
+      f.path !== "output/workspace/events.jsonl" &&
+      f.path !== "output/trace.jsonl" &&
+      f.path !== "output/.ready" &&
+      f.path !== "input.json",
+  )
+
+  return (
+    <div className="max-w-[820px] space-y-6">
+      <div className="text-ink-3 text-[12.5px]">
+        Sandbox task <span className="font-mono">{list.task_id.slice(0, 8)}</span>
+        {" · "}
+        {list.files.length} file{list.files.length === 1 ? "" : "s"}
+      </div>
+
+      {findings && <FindingsBlock runId={runId} path={findings.path} />}
+      {events && <EventsBlock runId={runId} path={events.path} />}
+      {trace && <TraceBlock runId={runId} path={trace.path} />}
+
+      {others.length > 0 && (
+        <Section title="Other artifacts">
+          <ul className="space-y-1.5 text-[13px]">
+            {others.map((f) => (
+              <li key={f.path} className="flex items-center gap-2">
+                <FileTextIcon className="text-ink-4 size-[12px]" />
+                <a
+                  href={`/api/runs/${runId}/sandbox/files/${f.path}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-foreground hover:underline"
+                >
+                  {f.path}
+                </a>
+                <span className="text-ink-4 ml-auto font-mono text-[11px]">
+                  {f.size} B
+                </span>
+                <ExternalLinkIcon className="text-ink-4 size-[11px]" />
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  )
+}
+
+function FindingsBlock({
+  runId,
+  path,
+}: {
+  runId: string
+  path: string
+}) {
+  const q = useFetch(
+    useCallback(() => readSandboxFile(runId, path), [runId, path]),
+    [runId, path],
+  )
+  return (
+    <Section title="Findings">
+      {q.loading ? (
+        <div className="text-ink-3 text-[12.5px]">Loading findings.md…</div>
+      ) : q.error ? (
+        <div className="text-err-ink text-[12.5px]">{q.error.message}</div>
+      ) : (
+        <pre className="border-border bg-card max-h-[480px] overflow-auto whitespace-pre-wrap rounded-md border p-3 text-[12.5px] leading-relaxed">
+          {q.data ?? "(empty)"}
+        </pre>
+      )}
+    </Section>
+  )
+}
+
+function EventsBlock({
+  runId,
+  path,
+}: {
+  runId: string
+  path: string
+}) {
+  const q = useFetch(
+    useCallback(() => readSandboxFile(runId, path), [runId, path]),
+    [runId, path],
+  )
+  if (q.error) return null
+  const lines = q.data ? parseEventsLines(q.data) : []
+  return (
+    <Section title="Activity log">
+      {q.loading ? (
+        <div className="text-ink-3 text-[12.5px]">Loading events.jsonl…</div>
+      ) : lines.length === 0 ? (
+        <div className="text-ink-3 text-[12.5px]">No activity recorded yet.</div>
+      ) : (
+        <div className="border-border bg-card max-h-[360px] overflow-auto rounded-md border">
+          <ul className="divide-border divide-y">
+            {lines.map((l, i) => (
+              <li key={i} className="flex gap-3 px-3 py-2 text-[12.5px]">
+                <span className="text-ink-4 w-[68px] shrink-0 font-mono text-[11px]">
+                  {l.ts ? formatAbsolute(l.ts).split(", ")[1] ?? "" : ""}
+                </span>
+                {l.kind && (
+                  <span className="bg-muted text-ink-3 h-fit rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+                    {l.kind}
+                  </span>
+                )}
+                <span className="text-ink-2 min-w-0 flex-1 break-words">
+                  {l.msg ?? l.raw}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Section>
+  )
+}
+
+function TraceBlock({
+  runId,
+  path,
+}: {
+  runId: string
+  path: string
+}) {
+  const [open, setOpen] = useState(false)
+  const q = useFetch(
+    useCallback(
+      async () => (open ? readSandboxFile(runId, path) : null),
+      [open, runId, path],
+    ),
+    [open, runId, path],
+  )
+  const lines = q.data ? parseTraceLines(q.data) : []
+  return (
+    <Section title="Detailed trace">
+      <div className="text-ink-3 mb-2 text-[12.5px]">
+        Every Anthropic API call, tool invocation, and result the sandbox made.
+        Useful for debugging.
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? (
+          <ChevronDownIcon className="size-[12px]" />
+        ) : (
+          <ChevronRightIcon className="size-[12px]" />
+        )}
+        {open ? "Hide trace" : "Show trace"}
+      </Button>
+      {open && (
+        <div className="mt-2">
+          {q.loading ? (
+            <div className="text-ink-3 text-[12.5px]">Loading trace.jsonl…</div>
+          ) : q.error ? (
+            <div className="text-err-ink text-[12.5px]">{q.error.message}</div>
+          ) : lines.length === 0 ? (
+            <div className="text-ink-3 text-[12.5px]">Trace is empty.</div>
+          ) : (
+            <div className="border-border bg-card max-h-[400px] overflow-auto rounded-md border">
+              <ul className="divide-border divide-y">
+                {lines.map((l, i) => (
+                  <li key={i} className="px-3 py-2 text-[12.5px]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-ink-4 font-mono text-[10.5px]">
+                        {l.ts ? formatAbsolute(l.ts).split(", ")[1] ?? "" : ""}
+                      </span>
+                      <span className="bg-muted text-ink-3 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+                        {l.kind ? TRACE_KIND_LABEL[l.kind] ?? l.kind : "raw"}
+                      </span>
+                      {l.name && (
+                        <span className="text-ink-3 font-mono text-[11px]">
+                          {l.name}
+                        </span>
+                      )}
+                      {typeof l.status_code === "number" && (
+                        <span className="text-ink-3 font-mono text-[11px]">
+                          {l.status_code}
+                        </span>
+                      )}
+                    </div>
+                    {l.text && (
+                      <div className="text-ink-2 mt-1 line-clamp-3 whitespace-pre-wrap text-[12.5px]">
+                        {l.text}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Section>
   )
 }

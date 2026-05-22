@@ -17,6 +17,7 @@ from api.routers import (
     projects_router,
     providers_router,
     runs_router,
+    sandbox_artifacts_router,
     test_scenarios_router,
 )
 
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(projects_router)
     app.include_router(test_scenarios_router)
     app.include_router(runs_router)
+    app.include_router(sandbox_artifacts_router)
 
     # ── Health ────────────────────────────────────────────────────────────────
     @app.get("/api/health", tags=["health"])

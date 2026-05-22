@@ -73,6 +73,9 @@ export type TestCaseStatus = Schemas["TestCaseStatus"]
 
 export type FeedbackRequest = Schemas["FeedbackRequest"]
 
+export type SandboxFileList = Schemas["SandboxFileList"]
+export type SandboxFile = Schemas["SandboxFile"]
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

@@ -8,7 +8,6 @@ import {
   ChevronLeftIcon,
   FlaskConicalIcon,
   FolderIcon,
-  HistoryIcon,
   LayoutDashboardIcon,
   Settings2Icon,
 } from "lucide-react"
@@ -61,20 +60,14 @@ function buildProjectNav(projectId: string): NavItem[] {
     {
       href: `${base}/testsets`,
       icon: FlaskConicalIcon,
-      label: "Test sets",
+      label: "Feature tests",
       match: (p) => p.startsWith(`${base}/testsets`),
     },
     {
       href: `${base}/runs`,
       icon: ActivityIcon,
       label: "Runs",
-      match: (p) => p.startsWith(`${base}/runs/`),
-    },
-    {
-      href: `${base}/runs`,
-      icon: HistoryIcon,
-      label: "Run history",
-      match: (p) => p === `${base}/runs`,
+      match: (p) => p.startsWith(`${base}/runs`),
     },
     {
       href: `${base}/settings`,
@@ -178,7 +171,7 @@ export function AppSidebar() {
                 {project.name}
               </span>
               <span className="text-sidebar-foreground/60 block truncate text-[11px]">
-                {project.id.slice(0, 8)}
+                Switch project
               </span>
             </span>
             <ChevronLeftIcon className="text-sidebar-foreground/50 size-[13px] transition-transform group-hover/proj:-translate-x-0.5" />
