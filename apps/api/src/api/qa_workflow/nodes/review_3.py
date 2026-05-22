@@ -17,6 +17,13 @@ async def human_review_3(state: QAWorkflowState) -> dict:
         await run_service.update_status(
             session, run_id, RunStatus.AGENT3_REVIEW.value, "human_review_3"
         )
+        await agent_event_service.create(
+            session,
+            run_id,
+            node_name="human_review_3",
+            event_type="interrupt",
+            payload={"type": "review_test_cases", "version": version},
+        )
 
     resume_value = interrupt({"type": "review_test_cases", "version": version})
 

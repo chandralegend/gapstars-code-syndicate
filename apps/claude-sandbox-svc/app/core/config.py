@@ -34,6 +34,17 @@ class Settings(BaseSettings):
     # Storage
     data_dir: Path = Field(default=Path("./data"), alias="DATA_DIR")
 
+    # When the service runs inside a container and spawns *sibling* containers
+    # via the host Docker daemon, ``data_dir`` (e.g. ``/data``) is the path
+    # *inside this container*. The host's Docker daemon, however, only knows
+    # the bind-mount source on the host filesystem (e.g.
+    # ``/Users/me/proj/apps/claude-sandbox-svc/data``).
+    #
+    # Setting ``HOST_DATA_DIR`` to that host-side path lets us translate
+    # per-task paths before passing them to docker-py's ``volumes=...``.
+    # Leave unset when running on the host directly (no translation needed).
+    host_data_dir: str | None = Field(default=None, alias="HOST_DATA_DIR")
+
     # Networking / VNC
     public_base_url: str = Field(default="http://127.0.0.1:8000", alias="PUBLIC_BASE_URL")
     vnc_proxy_mode: str = Field(default="proxy", alias="VNC_PROXY_MODE")  # "proxy" or "direct"
@@ -52,6 +63,24 @@ class Settings(BaseSettings):
     @property
     def tasks_dir(self) -> Path:
         return self.data_dir / "tasks"
+
+    def host_path_for(self, in_container_path: Path) -> str:
+        """Translate an in-container path under ``data_dir`` to its host equivalent.
+
+        Used when handing bind-mount paths to the host Docker daemon. If
+        ``host_data_dir`` is unset (running directly on the host), the input
+        path is returned unchanged.
+        """
+        if not self.host_data_dir:
+            return str(in_container_path)
+        try:
+            relative = Path(in_container_path).resolve().relative_to(
+                self.data_dir.resolve()
+            )
+        except ValueError:
+            # Path is not under data_dir; return as-is and hope for the best.
+            return str(in_container_path)
+        return str(Path(self.host_data_dir) / relative)
 
 
 @lru_cache(maxsize=1)

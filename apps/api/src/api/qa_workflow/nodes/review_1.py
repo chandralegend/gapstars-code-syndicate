@@ -6,7 +6,11 @@ from api.db.engine import async_session_maker
 from api.db.models.feature_expectation import FeatureExpectationStatus
 from api.db.models.run import RunStatus
 from api.qa_workflow.state import QAWorkflowState
-from api.services import feature_expectation_service, run_service
+from api.services import (
+    agent_event_service,
+    feature_expectation_service,
+    run_service,
+)
 
 
 async def human_review_1(state: QAWorkflowState) -> dict:
@@ -16,6 +20,13 @@ async def human_review_1(state: QAWorkflowState) -> dict:
     async with async_session_maker() as session:
         await run_service.update_status(
             session, run_id, RunStatus.AGENT1_REVIEW.value, "human_review_1"
+        )
+        await agent_event_service.create(
+            session,
+            run_id,
+            node_name="human_review_1",
+            event_type="interrupt",
+            payload={"type": "review_feature_expectation", "version": version},
         )
 
     resume_value = interrupt(
@@ -39,6 +50,18 @@ async def human_review_1(state: QAWorkflowState) -> dict:
                     FeatureExpectationStatus.REJECTED.value,
                     feedback=feedback,
                 )
+
+        await agent_event_service.create(
+            session,
+            run_id,
+            node_name="human_review_1",
+            event_type="feedback_received",
+            payload={
+                "decision": decision,
+                "version": version,
+                "has_feedback": bool(feedback),
+            },
+        )
 
     return {
         "human_decision_1": decision,
