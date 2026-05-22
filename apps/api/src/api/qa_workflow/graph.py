@@ -4,7 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from api.qa_workflow.nodes.agent_1 import make_agent_1_node
 from api.qa_workflow.nodes.agent_2 import agent_2_placeholder
-from api.qa_workflow.nodes.agent_3 import agent_3_generate
+from api.qa_workflow.nodes.agent_3 import make_agent_3_node
 from api.qa_workflow.nodes.load_context import load_project_context
 from api.qa_workflow.nodes.persist import persist_results
 from api.qa_workflow.nodes.review_1 import human_review_1
@@ -34,6 +34,7 @@ def build_qa_graph(
         llm = create_llm()
 
     agent_1_node = make_agent_1_node(llm)
+    agent_3_node = make_agent_3_node(llm)
 
     graph = StateGraph(QAWorkflowState)
 
@@ -41,7 +42,7 @@ def build_qa_graph(
     graph.add_node("agent_1_generate", agent_1_node)
     graph.add_node("human_review_1", human_review_1)
     graph.add_node("agent_2_placeholder", agent_2_placeholder)
-    graph.add_node("agent_3_generate", agent_3_generate)
+    graph.add_node("agent_3_generate", agent_3_node)
     graph.add_node("human_review_3", human_review_3)
     graph.add_node("persist_results", persist_results)
 
