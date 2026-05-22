@@ -28,7 +28,10 @@ interface Persona {
 }
 
 export default function OnboardPage() {
-  useSetBreadcrumbs([{ label: "New project" }])
+  useSetBreadcrumbs([
+    { label: "Projects", href: "/projects" },
+    { label: "New project" },
+  ])
   const router = useRouter()
 
   const [step, setStep] = useState(0)
@@ -233,8 +236,9 @@ export default function OnboardPage() {
             <Button
               variant="accent"
               onClick={() => {
-                toast.success("Project created — opening Tests")
-                setTimeout(() => router.push("/tests"), 400)
+                toast.success("Project created — opening project home")
+                // Demo: route into the seeded project's overview.
+                setTimeout(() => router.push("/projects/shop"), 400)
               }}
             >
               <CheckIcon className="size-[13px]" />

@@ -1,13 +1,16 @@
 "use client"
 
+import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   ActivityIcon,
+  ChevronLeftIcon,
   CodeIcon,
   FlaskConicalIcon,
+  FolderIcon,
   HistoryIcon,
+  LayoutDashboardIcon,
   Settings2Icon,
-  SparklesIcon,
 } from "lucide-react"
 
 import {
@@ -24,6 +27,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { getProject } from "@/lib/mock/projects"
 import { cn } from "@/lib/utils"
 
 type NavItem = {
@@ -34,28 +38,57 @@ type NavItem = {
   match?: (path: string) => boolean
 }
 
-const WORKSPACE: NavItem[] = [
-  { href: "/tests", icon: FlaskConicalIcon, label: "Tests", badge: "5" },
+const TOP: NavItem[] = [
   {
-    href: "/runs/run_018f2c",
-    icon: ActivityIcon,
-    label: "Runs",
-    badge: "1",
-    match: (path) => path.startsWith("/runs/"),
-  },
-  { href: "/scripts", icon: CodeIcon, label: "Scripts", badge: "43" },
-  {
-    href: "/runs",
-    icon: HistoryIcon,
-    label: "Run history",
-    match: (path) => path === "/runs",
+    href: "/projects",
+    icon: FolderIcon,
+    label: "Projects",
+    match: (p) =>
+      p === "/projects" || (p.startsWith("/projects") && p.split("/").length === 2),
   },
 ]
 
-const PROJECT: NavItem[] = [
-  { href: "/onboard", icon: SparklesIcon, label: "Onboarding" },
-  { href: "/settings", icon: Settings2Icon, label: "Settings" },
-]
+function buildProjectNav(projectId: string): NavItem[] {
+  const base = `/projects/${projectId}`
+  return [
+    {
+      href: base,
+      icon: LayoutDashboardIcon,
+      label: "Overview",
+      match: (p) => p === base,
+    },
+    {
+      href: `${base}/testsets`,
+      icon: FlaskConicalIcon,
+      label: "Test sets",
+      match: (p) => p.startsWith(`${base}/testsets`),
+    },
+    {
+      href: `${base}/runs`,
+      icon: ActivityIcon,
+      label: "Runs",
+      match: (p) => p.startsWith(`${base}/runs/`),
+    },
+    {
+      href: `${base}/runs`,
+      icon: HistoryIcon,
+      label: "Run history",
+      match: (p) => p === `${base}/runs`,
+    },
+    {
+      href: `${base}/scripts`,
+      icon: CodeIcon,
+      label: "Scripts",
+      match: (p) => p.startsWith(`${base}/scripts`),
+    },
+    {
+      href: `${base}/settings`,
+      icon: Settings2Icon,
+      label: "Settings",
+      match: (p) => p.startsWith(`${base}/settings`),
+    },
+  ]
+}
 
 function ProbeMark() {
   return (
@@ -68,9 +101,19 @@ function ProbeMark() {
   )
 }
 
+function projectIdFromPath(pathname: string): string | null {
+  // /projects/[projectId]/...
+  const m = pathname.match(/^\/projects\/([^/]+)(?:\/|$)/)
+  return m ? m[1] : null
+}
+
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+
+  const projectId = projectIdFromPath(pathname)
+  const project = projectId ? getProject(projectId) : null
+  const projectNav = projectId ? buildProjectNav(projectId) : []
 
   const renderNav = (items: NavItem[]) =>
     items.map((it) => {
@@ -79,7 +122,7 @@ export function AppSidebar() {
         : pathname === it.href || pathname.startsWith(it.href + "/")
       const Icon = it.icon
       return (
-        <SidebarMenuItem key={it.href}>
+        <SidebarMenuItem key={`${it.href}-${it.label}`}>
           <SidebarMenuButton
             isActive={active}
             onClick={() => router.push(it.href)}
@@ -120,26 +163,45 @@ export function AppSidebar() {
             Pr<em className="text-accent not-italic italic">o</em>be
           </div>
         </div>
+
+        {project && (
+          <Link
+            href="/projects"
+            className="bg-sidebar-accent/60 border-sidebar-border hover:bg-sidebar-accent group/proj mt-1 flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left group-data-[state=collapsed]:hidden"
+          >
+            <span className="grid size-[22px] place-items-center rounded-[5px] bg-gradient-to-br from-[oklch(0.65_0.15_200)] to-[oklch(0.55_0.15_280)] font-mono text-[11px] font-semibold text-white">
+              {project.name.slice(0, 2).toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px] font-medium text-[oklch(0.96_0.005_80)]">
+                {project.name}
+              </span>
+              <span className="text-sidebar-foreground/60 block truncate text-[11px]">
+                {project.stagingUrl}
+              </span>
+            </span>
+            <ChevronLeftIcon className="text-sidebar-foreground/50 size-[13px] transition-transform group-hover/proj:-translate-x-0.5" />
+          </Link>
+        )}
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/55 text-[10.5px] tracking-[0.08em] uppercase">
-            Workspace
-          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>{renderNav(WORKSPACE)}</SidebarMenu>
+            <SidebarMenu>{renderNav(TOP)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/55 text-[10.5px] tracking-[0.08em] uppercase">
-            Project
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>{renderNav(PROJECT)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {project && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/55 text-[10.5px] tracking-[0.08em] uppercase">
+              {project.name}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{renderNav(projectNav)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter />
