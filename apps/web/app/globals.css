@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-serif);
+    --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     --font-serif: var(--font-serif);
     --font-mono: var(--font-mono);
@@ -37,7 +37,7 @@
     --color-foreground: var(--foreground);
     --color-background: var(--background);
 
-    /* Probe-specific tokens */
+    /* QALoop semantic tokens (kept stable for component code) */
     --color-ink-2: var(--ink-2);
     --color-ink-3: var(--ink-3);
     --color-ink-4: var(--ink-4);
@@ -57,129 +57,147 @@
     --color-info-soft: var(--info-soft);
     --color-info-ink: var(--info-ink);
 
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 10px;
+    --radius-2xl: 12px;
+    --radius-3xl: 16px;
+    --radius-4xl: 20px;
 }
 
+/*
+ * Light theme — Vercel-leaning. Pure white surfaces, near-black ink,
+ * a single neutral accent (also near-black) so primary actions read as
+ * "this one matters" instead of "this is branded orange". Status tones
+ * carry meaning via colour as before.
+ */
 :root {
     --radius: 6px;
 
-    --background: oklch(0.985 0.004 80);
-    --foreground: oklch(0.18 0.012 260);
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.18 0.012 260);
+    --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.18 0.012 260);
+    --popover-foreground: oklch(0.145 0 0);
 
-    --primary: oklch(0.18 0.012 260);
-    --primary-foreground: oklch(0.98 0 0);
+    --primary: oklch(0.145 0 0);
+    --primary-foreground: oklch(0.985 0 0);
 
-    --secondary: oklch(0.965 0.005 80);
-    --secondary-foreground: oklch(0.18 0.012 260);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.145 0 0);
 
-    --muted: oklch(0.965 0.005 80);
-    --muted-foreground: oklch(0.5 0.01 260);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
 
-    --accent: oklch(0.62 0.16 45);
-    --accent-foreground: oklch(0.32 0.13 45);
-    --accent-soft: oklch(0.94 0.04 60);
-    --accent-ink: oklch(0.32 0.13 45);
+    /*
+     * Accent in this system means "row hover / subtle highlight",
+     * not "brand colour". The semantic actions still go through
+     * `primary`, which is near-black.
+     */
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.145 0 0);
+    --accent-soft: oklch(0.97 0 0);
+    --accent-ink: oklch(0.145 0 0);
 
-    --destructive: oklch(0.58 0.2 25);
+    --destructive: oklch(0.577 0.245 27.325);
 
-    --border: oklch(0.92 0.005 260);
-    --input: oklch(0.92 0.005 260);
-    --ring: oklch(0.62 0.16 45);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
 
-    --ink-2: oklch(0.32 0.012 260);
-    --ink-3: oklch(0.5 0.01 260);
-    --ink-4: oklch(0.68 0.008 260);
-    --line-2: oklch(0.95 0.004 260);
+    --ink-2: oklch(0.205 0 0);
+    --ink-3: oklch(0.5 0 0);
+    --ink-4: oklch(0.708 0 0);
+    --line-2: oklch(0.96 0 0);
 
-    --ok: oklch(0.62 0.13 155);
-    --ok-soft: oklch(0.94 0.04 155);
-    --ok-ink: oklch(0.35 0.12 155);
-    --warn: oklch(0.74 0.14 80);
-    --warn-soft: oklch(0.95 0.06 85);
-    --warn-ink: oklch(0.4 0.13 70);
-    --err: oklch(0.58 0.2 25);
-    --err-soft: oklch(0.95 0.04 25);
-    --err-ink: oklch(0.4 0.18 25);
-    --info: oklch(0.6 0.13 240);
-    --info-soft: oklch(0.95 0.03 240);
-    --info-ink: oklch(0.38 0.13 240);
+    --ok: oklch(0.6 0.118 184.704);
+    --ok-soft: oklch(0.97 0.04 175);
+    --ok-ink: oklch(0.398 0.07 184.704);
+    --warn: oklch(0.769 0.188 70.08);
+    --warn-soft: oklch(0.97 0.06 80);
+    --warn-ink: oklch(0.45 0.15 70);
+    --err: oklch(0.577 0.245 27.325);
+    --err-soft: oklch(0.97 0.04 25);
+    --err-ink: oklch(0.396 0.18 27.325);
+    --info: oklch(0.6 0.118 240);
+    --info-soft: oklch(0.97 0.03 240);
+    --info-ink: oklch(0.398 0.13 240);
 
-    /* Dark sidebar (same in light + dark mode) */
-    --sidebar: oklch(0.2 0.012 260);
-    --sidebar-foreground: oklch(0.86 0.005 260);
-    --sidebar-primary: oklch(0.62 0.16 45);
-    --sidebar-primary-foreground: oklch(0.2 0.012 260);
-    --sidebar-accent: oklch(0.3 0.015 260);
-    --sidebar-accent-foreground: oklch(0.98 0.005 80);
-    --sidebar-border: oklch(0.28 0.012 260);
-    --sidebar-ring: oklch(0.62 0.16 45);
+    /*
+     * Sidebar = page background. Vercel does not use a dark left rail
+     * when the rest of the app is light. We rely on a single border
+     * line for the boundary instead.
+     */
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.145 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.95 0 0);
+    --sidebar-accent-foreground: oklch(0.145 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
 }
 
+/*
+ * Dark theme — true black / white. Surfaces lift off the page with a
+ * single 1px border instead of a fill change.
+ */
 .dark {
-    --background: oklch(0.16 0.008 260);
-    --foreground: oklch(0.94 0.005 80);
-    --card: oklch(0.22 0.012 260);
-    --card-foreground: oklch(0.94 0.005 80);
-    --popover: oklch(0.22 0.012 260);
-    --popover-foreground: oklch(0.94 0.005 80);
+    --background: oklch(0 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.145 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.145 0 0);
+    --popover-foreground: oklch(0.985 0 0);
 
-    --primary: oklch(0.94 0.005 80);
-    --primary-foreground: oklch(0.18 0.012 260);
+    --primary: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.145 0 0);
 
-    --secondary: oklch(0.26 0.012 260);
-    --secondary-foreground: oklch(0.94 0.005 80);
+    --secondary: oklch(0.205 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
 
-    --muted: oklch(0.24 0.012 260);
-    --muted-foreground: oklch(0.7 0.008 260);
+    --muted: oklch(0.205 0 0);
+    --muted-foreground: oklch(0.708 0 0);
 
-    --accent: oklch(0.7 0.17 50);
-    --accent-foreground: oklch(0.18 0.012 260);
-    --accent-soft: oklch(0.32 0.08 50);
-    --accent-ink: oklch(0.88 0.13 60);
+    --accent: oklch(0.205 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --accent-soft: oklch(0.205 0 0);
+    --accent-ink: oklch(0.985 0 0);
 
-    --destructive: oklch(0.68 0.2 25);
+    --destructive: oklch(0.704 0.191 22.216);
 
-    --border: oklch(0.3 0.012 260);
-    --input: oklch(0.3 0.012 260);
-    --ring: oklch(0.7 0.17 50);
+    --border: oklch(0.205 0 0);
+    --input: oklch(0.205 0 0);
+    --ring: oklch(0.439 0 0);
 
-    --ink-2: oklch(0.82 0.005 260);
-    --ink-3: oklch(0.68 0.008 260);
-    --ink-4: oklch(0.55 0.01 260);
-    --line-2: oklch(0.26 0.01 260);
+    --ink-2: oklch(0.85 0 0);
+    --ink-3: oklch(0.65 0 0);
+    --ink-4: oklch(0.5 0 0);
+    --line-2: oklch(0.18 0 0);
 
-    --ok: oklch(0.78 0.16 155);
-    --ok-soft: oklch(0.3 0.07 155);
-    --ok-ink: oklch(0.88 0.14 155);
-    --warn: oklch(0.82 0.16 80);
-    --warn-soft: oklch(0.32 0.08 80);
-    --warn-ink: oklch(0.9 0.14 80);
-    --err: oklch(0.7 0.2 25);
-    --err-soft: oklch(0.3 0.1 25);
-    --err-ink: oklch(0.88 0.16 25);
-    --info: oklch(0.72 0.14 240);
-    --info-soft: oklch(0.3 0.07 240);
-    --info-ink: oklch(0.86 0.12 240);
+    --ok: oklch(0.696 0.17 162.48);
+    --ok-soft: oklch(0.18 0.05 162);
+    --ok-ink: oklch(0.85 0.14 162);
+    --warn: oklch(0.769 0.188 70.08);
+    --warn-soft: oklch(0.18 0.06 80);
+    --warn-ink: oklch(0.88 0.14 80);
+    --err: oklch(0.704 0.191 22.216);
+    --err-soft: oklch(0.2 0.08 25);
+    --err-ink: oklch(0.85 0.16 25);
+    --info: oklch(0.696 0.13 240);
+    --info-soft: oklch(0.18 0.05 240);
+    --info-ink: oklch(0.84 0.13 240);
 
-    /* Sidebar slightly darker than card in dark mode for separation */
-    --sidebar: oklch(0.13 0.008 260);
-    --sidebar-foreground: oklch(0.82 0.006 260);
-    --sidebar-primary: oklch(0.7 0.17 50);
-    --sidebar-primary-foreground: oklch(0.18 0.012 260);
-    --sidebar-accent: oklch(0.22 0.012 260);
-    --sidebar-accent-foreground: oklch(0.96 0.005 80);
-    --sidebar-border: oklch(0.22 0.012 260);
-    --sidebar-ring: oklch(0.7 0.17 50);
+    --sidebar: oklch(0 0 0);
+    --sidebar-foreground: oklch(0.708 0 0);
+    --sidebar-primary: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.145 0 0);
+    --sidebar-accent: oklch(0.205 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(0.205 0 0);
+    --sidebar-ring: oklch(0.439 0 0);
 }
 
 @layer base {
@@ -198,8 +216,12 @@
         @apply font-sans;
     }
     ::selection {
-        background: var(--accent-soft);
-        color: var(--accent-ink);
+        background: oklch(0.145 0 0);
+        color: oklch(0.985 0 0);
+    }
+    .dark ::selection {
+        background: oklch(0.985 0 0);
+        color: oklch(0.145 0 0);
     }
 }
 

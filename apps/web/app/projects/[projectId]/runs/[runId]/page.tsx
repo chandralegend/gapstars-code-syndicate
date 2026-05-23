@@ -22,6 +22,7 @@ import { CapLine } from "@/components/probe/cap-line"
 import { RelativeTime, formatAbsolute, formatDuration } from "@/lib/format"
 import { RunStatusBadge } from "@/components/probe/run-status-badge"
 import { StatusDot } from "@/components/probe/status-dot"
+import { PageContainer } from "@/components/shell/page-container"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,12 +37,14 @@ import {
   caseCategoryTitle,
   caseStatusLabel,
   eventLabel,
+  eventSummary,
   nodeLabel,
   nodeOrderIndex,
   nodePhase,
   runPhaseTitle,
   runStatusDot,
   runStatusTone,
+  shouldShowEvent,
   runStepperState,
 } from "@/lib/labels"
 import {
@@ -335,29 +338,31 @@ export default function ProjectRunDetailPage({
   }
 
   return (
-    <div className="grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[360px_minmax(0,1fr)]">
-      <aside className="border-border min-w-0 overflow-auto border-b lg:border-r lg:border-b-0">
-        <Timeline
-          run={run}
-          runError={runError}
-          events={events}
-          runId={runId}
-        />
-      </aside>
-      <section className="min-w-0 overflow-hidden">
-        <RightPanel
-          run={run}
-          runId={runId}
-          fe={feQ.data ?? undefined}
-          cases={casesQ.data ?? []}
-          sandboxStarted={sandboxStarted}
-          feedbackText={feedbackText}
-          onFeedbackTextChange={setFeedbackText}
-          onSubmit={submit}
-          submitting={feedback.loading}
-        />
-      </section>
-    </div>
+    <PageContainer size="wide" className="h-full">
+      <div className="grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="border-border min-w-0 overflow-auto border-b lg:border-r lg:border-b-0">
+          <Timeline
+            run={run}
+            runError={runError}
+            events={events}
+            runId={runId}
+          />
+        </aside>
+        <section className="min-w-0 overflow-hidden">
+          <RightPanel
+            run={run}
+            runId={runId}
+            fe={feQ.data ?? undefined}
+            cases={casesQ.data ?? []}
+            sandboxStarted={sandboxStarted}
+            feedbackText={feedbackText}
+            onFeedbackTextChange={setFeedbackText}
+            onSubmit={submit}
+            submitting={feedback.loading}
+          />
+        </section>
+      </div>
+    </PageContainer>
   )
 }
 
@@ -564,7 +569,21 @@ function NodeCard({
 }) {
   const [open, setOpen] = useState(false)
   const status = bucketStatus(bucket, runStatus)
-  const eventCount = bucket.events.length
+  // Drop noisy / superseded events. The bucket header already shows
+  // the outcome of the phase, so we don't need every transitional
+  // breadcrumb. shouldShowEvent walks the *future* of the bucket so
+  // it can hide an early progress event when a later one exists.
+  const visibleEvents = useMemo(() => {
+    const out: SseEvent[] = []
+    for (let i = 0; i < bucket.events.length; i += 1) {
+      const e = bucket.events[i]
+      if (shouldShowEvent(e, bucket.events.slice(i + 1))) {
+        out.push(e)
+      }
+    }
+    return out
+  }, [bucket.events])
+  const eventCount = visibleEvents.length
   return (
     <div
       className={cn(
@@ -611,10 +630,14 @@ function NodeCard({
       </div>
 
       {open && (
-        <div className="border-border mt-2 space-y-1 border-t pt-2">
-          {bucket.events.map((e) => (
-            <EventLine key={e.id} e={e} />
-          ))}
+        <div className="border-border mt-2 space-y-2 border-t pt-2">
+          {visibleEvents.length === 0 ? (
+            <div className="text-ink-4 text-[11.5px]">
+              No events to show beyond the summary above.
+            </div>
+          ) : (
+            visibleEvents.map((e) => <EventLine key={e.id} e={e} />)
+          )}
         </div>
       )}
     </div>
@@ -622,22 +645,34 @@ function NodeCard({
 }
 
 function EventLine({ e }: { e: SseEvent }) {
+  const summary = eventSummary(e.type, e.payload)
+  const hasPayload =
+    e.payload != null &&
+    typeof e.payload === "object" &&
+    Object.keys(e.payload as Record<string, unknown>).length > 0
   return (
-    <div className="text-[11.5px] leading-snug">
-      <div className="flex items-center gap-2">
-        <span className="bg-muted text-ink-3 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+    <div className="text-[12px] leading-snug">
+      <div className="flex items-baseline gap-2">
+        <span className="text-foreground font-medium">
           {eventLabel(e.type)}
         </span>
-        <span className="text-ink-4 ml-auto font-mono text-[10.5px]">
+        {summary && (
+          <span className="text-ink-3 truncate">{summary}</span>
+        )}
+        <span className="text-ink-4 ml-auto shrink-0 font-mono text-[10.5px]">
           <RelativeTime iso={e.created_at} />
         </span>
       </div>
-      {e.payload != null && (
-        <pre className="text-ink-3 mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[11px]">
-          {typeof e.payload === "string"
-            ? e.payload
-            : JSON.stringify(e.payload, null, 0)}
-        </pre>
+      {hasPayload && (
+        <details className="group/det mt-1">
+          <summary className="text-ink-4 hover:text-ink-3 cursor-pointer list-none text-[10.5px] select-none">
+            <span className="group-open/det:hidden">Show details</span>
+            <span className="hidden group-open/det:inline">Hide details</span>
+          </summary>
+          <pre className="text-ink-3 bg-muted/50 mt-1 max-h-[200px] overflow-auto rounded-[4px] p-2 font-mono text-[10.5px] whitespace-pre-wrap">
+            {JSON.stringify(e.payload, null, 2)}
+          </pre>
+        </details>
       )}
     </div>
   )

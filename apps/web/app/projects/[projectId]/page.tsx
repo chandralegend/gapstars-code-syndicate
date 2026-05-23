@@ -12,6 +12,7 @@ import {
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
 import { RunStatusBadge } from "@/components/probe/run-status-badge"
+import { PageContainer } from "@/components/shell/page-container"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -92,7 +93,7 @@ export default function ProjectOverviewPage({
   ]
 
   return (
-    <>
+    <PageContainer>
       <PageHead
         title={project.name}
         sub={
@@ -126,7 +127,7 @@ export default function ProjectOverviewPage({
         }
       />
 
-      <div className="max-w-[1200px] px-6 py-6">
+      <div className="py-6">
         {liveRun && (
           <button
             type="button"
@@ -218,7 +219,7 @@ export default function ProjectOverviewPage({
           </>
         )}
       </div>
-    </>
+    </PageContainer>
   )
 }
 

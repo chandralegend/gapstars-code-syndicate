@@ -10,6 +10,7 @@ import {
 
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
+import { PageContainer } from "@/components/shell/page-container"
 import { Button } from "@/components/ui/button"
 import { listProjects, useFetch } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
@@ -23,7 +24,7 @@ export default function ProjectsPage() {
   const hasProjects = count > 0
 
   return (
-    <>
+    <PageContainer>
       <PageHead
         title="Projects"
         sub={
@@ -39,7 +40,7 @@ export default function ProjectsPage() {
         }
       />
 
-      <div className="max-w-[1200px] px-6 py-6">
+      <div className="py-6">
         {error && (
           <div className="border-err/40 bg-err-soft text-err-ink mb-4 rounded-md border p-3 text-[13px]">
             Could not load projects: {error.message}
@@ -109,6 +110,6 @@ export default function ProjectsPage() {
           </>
         )}
       </div>
-    </>
+    </PageContainer>
   )
 }

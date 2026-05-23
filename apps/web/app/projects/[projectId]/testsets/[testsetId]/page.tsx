@@ -9,6 +9,7 @@ import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
 import { RunStatusBadge } from "@/components/probe/run-status-badge"
 import { StatCard } from "@/components/probe/stat-card"
+import { PageContainer } from "@/components/shell/page-container"
 import { Button } from "@/components/ui/button"
 import {
   Tabs,
@@ -98,7 +99,7 @@ export default function TestsetDetailPage({
   }
 
   return (
-    <>
+    <PageContainer>
       <PageHead
         title={scenario.title}
         sub={scenario.feature_description}
@@ -114,7 +115,7 @@ export default function TestsetDetailPage({
         }
       />
 
-      <div className="mx-auto max-w-[1200px] px-6 py-6">
+      <div className="py-6">
         <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           <StatCard label="Status" value={scenario.status} />
           <StatCard label="Runs" value={String(runs.length)} delta="lifetime" />
@@ -206,7 +207,7 @@ export default function TestsetDetailPage({
           </TabsContent>
         </Tabs>
       </div>
-    </>
+    </PageContainer>
   )
 }
 

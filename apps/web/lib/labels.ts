@@ -151,6 +151,129 @@ export function eventLabel(eventType: string): string {
   return EVENT_LABEL[eventType] ?? eventType
 }
 
+/**
+ * Plain-language one-liner summarising an event's payload, suitable
+ * for inline display next to the event label so users don't have to
+ * parse JSON to understand what happened.
+ *
+ * Returns null when the event has nothing useful to say beyond its
+ * label (e.g. "Stream closed").
+ */
+export function eventSummary(
+  eventType: string,
+  payload: unknown,
+): string | null {
+  if (payload == null || typeof payload !== "object") return null
+  const p = payload as Record<string, unknown>
+
+  switch (eventType) {
+    case "node_start": {
+      if (p.is_revision === true) return "Revising after feedback"
+      return null
+    }
+    case "node_end": {
+      if (typeof p.version === "number") return `Saved as version ${p.version}`
+      return null
+    }
+    case "interrupt": {
+      const t = p.type
+      if (t === "review_feature_expectation") return "Review the brief"
+      if (t === "review_test_cases") return "Review the test cases"
+      return null
+    }
+    case "feedback_received": {
+      const dec = String(p.decision ?? "")
+      const fb = p.has_feedback === true ? " with notes" : ""
+      if (dec === "approve") return `Approved${fb}`
+      if (dec === "request_changes" || dec === "reject")
+        return `Changes requested${fb}`
+      return null
+    }
+    case "sandbox_task_created": {
+      const ts = typeof p.timeout_seconds === "number" ? p.timeout_seconds : null
+      return ts ? `Up to ${Math.round(ts / 60)}m to explore` : null
+    }
+    case "sandbox_task_progress": {
+      const s = String(p.status ?? "")
+      if (s === "queued") return "Waiting for a runner"
+      if (s === "running") return "Exploring the feature"
+      if (s === "succeeded") return "Exploration succeeded"
+      if (s === "failed") return "Exploration failed"
+      return null
+    }
+    case "sandbox_timeout_extended": {
+      const added = typeof p.added_seconds === "number" ? p.added_seconds : null
+      return added ? `Added ${Math.round(added / 60)} more minutes` : null
+    }
+    case "sandbox_task_completed":
+    case "sandbox_task_recovered": {
+      const files = Array.isArray(p.files) ? p.files.length : null
+      const screens = Array.isArray(p.files)
+        ? (p.files as string[]).filter((f) => f.includes("screenshots/")).length
+        : 0
+      if (files == null) return null
+      if (screens > 0) {
+        return `${files} files captured, ${screens} screenshots`
+      }
+      return `${files} files captured`
+    }
+    case "script_bundle_progress": {
+      const phase = String(p.phase ?? p.step ?? "")
+      if (phase) return phase
+      return null
+    }
+    case "script_bundle_succeeded": {
+      const tests = typeof p.test_count === "number" ? p.test_count : null
+      return tests != null ? `${tests} tests scripted` : null
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * Whether an event row deserves a place in the timeline at all. Some
+ * events (intermediate sandbox_progress states once we've already seen
+ * a later one, duplicate interrupts, etc.) just add noise; the bucket
+ * header already summarises the phase outcome.
+ *
+ * `keptAfter` mirrors the bucket's later events so we can hide
+ * earlier transitional ones.
+ */
+export function shouldShowEvent(
+  e: { type: string; payload: unknown },
+  laterEvents: { type: string; payload: unknown }[],
+): boolean {
+  // Hide the run-kickoff "Started" envelope because its payload is
+  // just the project + scenario id.
+  if (e.type === "node_start" && e.payload != null) {
+    const p = e.payload as Record<string, unknown>
+    if ("project_id" in p && "scenario_id" in p) return false
+  }
+
+  // Collapse duplicate interrupt events on the same review type.
+  if (e.type === "interrupt") {
+    const dup = laterEvents.find(
+      (l) =>
+        l.type === "interrupt" &&
+        JSON.stringify((l.payload as Record<string, unknown>) ?? {}) ===
+          JSON.stringify((e.payload as Record<string, unknown>) ?? {}),
+    )
+    if (dup) return false
+  }
+
+  // Sandbox progress: keep only the final state. If a later progress
+  // event exists in this bucket, hide the earlier ones.
+  if (e.type === "sandbox_task_progress") {
+    const laterProgress = laterEvents.find(
+      (l) => l.type === "sandbox_task_progress",
+    )
+    if (laterProgress) return false
+  }
+
+  return true
+}
+
 // ── Test cases ──────────────────────────────────────────────────────────────
 
 const CASE_STATUS_LABEL: Record<string, string> = {

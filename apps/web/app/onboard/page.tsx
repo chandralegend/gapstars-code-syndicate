@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PageContainer } from "@/components/shell/page-container"
 import { Textarea } from "@/components/ui/textarea"
 import { createProject, useMutation } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
@@ -81,7 +82,7 @@ export default function OnboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[820px] px-6 py-8">
+    <PageContainer size="narrow" className="py-8">
       <div className="mb-7 flex items-center">
         {STEPS.map((s, i) => (
           <div key={i} className="flex flex-1 items-center last:flex-initial">
@@ -118,7 +119,7 @@ export default function OnboardPage() {
       </div>
 
       <div className="border-border bg-card rounded-lg border p-6">
-        <h2 className="font-serif text-[26px] leading-tight tracking-[-0.012em]">
+        <h2 className="text-[24px] leading-tight font-semibold tracking-[-0.02em]">
           {step === 0 && "Tell us about the project"}
           {step === 1 && "What problem does it solve?"}
           {step === 2 && "Who uses it and how is it built?"}
@@ -180,7 +181,7 @@ export default function OnboardPage() {
                 onChange={(e) =>
                   setForm({ ...form, target_users: e.target.value })
                 }
-                placeholder="Internal QA engineers; mobile-first shoppers; SREs running probes."
+                placeholder="Internal QA engineers; mobile-first shoppers; SREs running test suites."
               />
             </Field>
             <Field label="Tech stack (optional)">
@@ -267,7 +268,7 @@ export default function OnboardPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 

@@ -26,7 +26,7 @@ export function StatCard({
         {label}
       </div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span className="font-serif text-[30px] leading-none tracking-[-0.015em]">
+        <span className="text-[26px] leading-none font-semibold tracking-[-0.02em]">
           {value}
         </span>
         {unit && <span className="text-ink-4 font-mono text-[12px]">{unit}</span>}

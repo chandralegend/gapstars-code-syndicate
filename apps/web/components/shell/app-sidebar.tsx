@@ -77,13 +77,16 @@ function buildProjectNav(projectId: string): NavItem[] {
   ]
 }
 
-function ProbeMark() {
+function QALoopMark() {
+  // A 24px square, mono-style. The dot replaces the second 'O' so the
+  // mark reads as 'QAL○○P' at a glance; tightens to a clean square in
+  // the collapsed sidebar.
   return (
     <div
       aria-hidden
-      className="bg-accent relative grid size-[26px] place-items-center rounded-[6px] shadow-[0_0_0_1px_oklch(0.55_0.18_45/0.6),0_2px_8px_oklch(0.55_0.18_45/0.25)]"
+      className="border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground grid size-[26px] place-items-center rounded-[5px] border font-mono text-[10.5px] font-semibold tracking-tight"
     >
-      <span className="size-2 rounded-full bg-[oklch(0.98_0.01_60)] shadow-[0_0_0_2px_oklch(0.45_0.15_45)]" />
+      QL
     </div>
   )
 }
@@ -153,9 +156,9 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-sidebar-border border-r">
       <SidebarHeader className="gap-3 px-3 pt-3.5">
         <div className="flex items-center gap-2.5 px-1">
-          <ProbeMark />
-          <div className="font-serif text-[22px] leading-none tracking-[-0.01em] text-[oklch(0.97_0.005_80)] group-data-[state=collapsed]:hidden">
-            Pr<em className="text-accent not-italic italic">o</em>be
+          <QALoopMark />
+          <div className="text-sidebar-foreground font-sans text-[15px] leading-none font-semibold tracking-[-0.01em] group-data-[state=collapsed]:hidden">
+            QALoop
           </div>
         </div>
 
@@ -171,7 +174,7 @@ export function AppSidebar() {
               {project.name.slice(0, 2).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12.5px] font-medium text-[oklch(0.96_0.005_80)]">
+              <span className="text-sidebar-foreground block truncate text-[12.5px] font-medium">
                 {project.name}
               </span>
               <span className="text-sidebar-foreground/60 block truncate text-[11px]">

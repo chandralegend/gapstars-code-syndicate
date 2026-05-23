@@ -180,7 +180,7 @@ export function CommandPalette() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title="Search Probe"
+      title="Search QALoop"
       description="Jump to a project, feature test, or run, or run a quick action."
     >
       <CommandInput placeholder="Search projects, feature tests, runs…" />

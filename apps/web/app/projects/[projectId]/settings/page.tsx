@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
+import { PageContainer } from "@/components/shell/page-container"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -103,9 +104,9 @@ export default function ProjectSettingsPage({
   }
 
   return (
-    <>
+    <PageContainer size="narrow">
       <PageHead title="Settings" sub={project.name} />
-      <div className="max-w-[820px] space-y-4 px-6 py-6">
+      <div className="space-y-4 py-6">
         <Card>
           <CapLine className="mb-4">project</CapLine>
           <div className="space-y-4">
@@ -167,7 +168,7 @@ export default function ProjectSettingsPage({
           </Button>
         </div>
       </div>
-    </>
+    </PageContainer>
   )
 }
 

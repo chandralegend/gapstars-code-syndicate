@@ -6,6 +6,7 @@ import { ChevronRightIcon, PlusIcon } from "lucide-react"
 
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
+import { PageContainer } from "@/components/shell/page-container"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -72,7 +73,7 @@ export default function TestsetsListPage({
   ]
 
   return (
-    <>
+    <PageContainer>
       <PageHead
         title="Feature tests"
         sub={`${subtitleParts.join(" · ")} · in ${project.name}`}
@@ -87,7 +88,7 @@ export default function TestsetsListPage({
         }
       />
 
-      <div className="max-w-[1200px] px-6 py-6">
+      <div className="py-6">
         {scenarios.length === 0 ? (
           <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
             <div className="text-[15px] font-medium">No feature tests yet</div>
@@ -165,6 +166,6 @@ export default function TestsetsListPage({
           </>
         )}
       </div>
-    </>
+    </PageContainer>
   )
 }

@@ -14,12 +14,12 @@ export function PageHead({
   return (
     <div
       className={cn(
-        "border-border flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b px-6 pt-6 pb-5",
+        "border-border flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b pt-6 pb-5",
         className,
       )}
     >
       <div className="min-w-0 flex-1">
-        <h1 className="font-serif text-[clamp(24px,4vw,34px)] leading-[1.1] tracking-[-0.015em]">
+        <h1 className="text-[clamp(22px,3vw,28px)] leading-[1.15] font-semibold tracking-[-0.02em]">
           {title}
         </h1>
         {sub && <div className="text-ink-3 mt-1 text-[13px]">{sub}</div>}

@@ -7,6 +7,7 @@ import { ChevronRightIcon } from "lucide-react"
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
 import { RunStatusBadge } from "@/components/probe/run-status-badge"
+import { PageContainer } from "@/components/shell/page-container"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -72,13 +73,13 @@ export default function ProjectRunsPage({
   if (failed > 0) subtitleParts.push(`${failed} failed`)
 
   return (
-    <>
+    <PageContainer>
       <PageHead
         title="Runs"
         sub={`${subtitleParts.join(" · ")} · across ${project.name}`}
       />
 
-      <div className="max-w-[1200px] px-6 py-6">
+      <div className="py-6">
         <div className="mb-3">
           <CapLine>recent runs</CapLine>
           <div className="text-ink-3 mt-0.5 text-[12px]">
@@ -138,6 +139,6 @@ export default function ProjectRunsPage({
           </div>
         )}
       </div>
-    </>
+    </PageContainer>
   )
 }

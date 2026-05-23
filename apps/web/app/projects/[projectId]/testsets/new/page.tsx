@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { PageContainer } from "@/components/shell/page-container"
 import {
   createTestScenario,
   getProject,
@@ -140,7 +141,7 @@ export default function NewTestsetPage({
   const summaryVisible = submitted && Object.keys(errors).length > 0
 
   return (
-    <div className="mx-auto max-w-[820px] px-6 py-8">
+    <PageContainer size="narrow" className="py-8">
       <div className="mb-3">
         <Button
           variant="ghost"
@@ -152,7 +153,7 @@ export default function NewTestsetPage({
         </Button>
       </div>
 
-      <h1 className="font-serif text-[34px] leading-tight tracking-[-0.015em]">
+      <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.02em]">
         New feature test
       </h1>
       <p className="text-ink-3 mt-1 mb-5 text-[13.5px]">
@@ -287,7 +288,7 @@ export default function NewTestsetPage({
           {createMut.loading ? "Creating…" : "Create feature test"}
         </Button>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 
