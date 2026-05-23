@@ -19,6 +19,8 @@ export default function ProjectsPage() {
   const router = useRouter()
 
   const { data: projects, error, loading } = useFetch(listProjects)
+  const count = projects?.length ?? 0
+  const hasProjects = count > 0
 
   return (
     <>
@@ -26,8 +28,8 @@ export default function ProjectsPage() {
         title="Projects"
         sub={
           loading
-            ? "loading…"
-            : `${(projects?.length ?? 0)} project${(projects?.length ?? 0) === 1 ? "" : "s"}`
+            ? "Loading…"
+            : `${count} project${count === 1 ? "" : "s"}`
         }
         actions={
           <Button variant="accent" onClick={() => router.push("/onboard")}>
@@ -38,65 +40,73 @@ export default function ProjectsPage() {
       />
 
       <div className="max-w-[1200px] px-6 py-6">
-        <div className="mb-3">
-          <CapLine>your projects</CapLine>
-          <div className="text-ink-3 mt-0.5 text-[12px]">
-            each project owns its own test sets, scripts, and run history
-          </div>
-        </div>
-
         {error && (
           <div className="border-err/40 bg-err-soft text-err-ink mb-4 rounded-md border p-3 text-[13px]">
-            Failed to load projects: {error.message}
+            Could not load projects: {error.message}
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {projects?.map((p) => (
-            <Link
-              key={p.id}
-              href={`/projects/${p.id}`}
-              className="border-border bg-card hover:border-ink-4/60 flex flex-col rounded-lg border p-5 transition-colors"
-            >
-              <div className="mb-1 flex items-center gap-2">
-                <span className="text-ink-4 ml-auto font-mono text-[11px]">
-                  {p.id.slice(0, 8)}
-                </span>
-              </div>
-              <div className="mt-1 text-[15px] font-medium">{p.name}</div>
-              <p className="text-ink-3 mt-1 line-clamp-2 text-[12.5px] leading-relaxed">
-                {p.description}
-              </p>
-              <div className="text-ink-4 mt-4 flex items-center gap-3 font-mono text-[11px]">
-                <span className="flex items-center gap-1">
-                  <FlaskConicalIcon className="size-[11px]" />
-                  test sets
-                </span>
-                <span className="ml-auto inline-flex items-center gap-0.5">
-                  open
-                  <ChevronRightIcon className="size-[12px]" />
-                </span>
-              </div>
-            </Link>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => router.push("/onboard")}
-            className="border-border text-ink-3 hover:border-ink-4/60 hover:text-foreground flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors"
-          >
-            <PlusIcon className="size-[18px]" />
-            <span className="text-[13px] font-medium">New project</span>
-            <span className="text-ink-4 text-[11.5px]">
-              Run onboarding to seed context, personas, and rules
-            </span>
-          </button>
-        </div>
-
-        {!loading && (projects?.length ?? 0) === 0 && (
-          <div className="text-ink-3 mt-6 text-center text-[13px]">
-            No projects yet. Click <em>New project</em> to create one.
+        {loading && !projects && (
+          <div className="text-ink-3 py-12 text-center text-[13px]">
+            Loading projects…
           </div>
+        )}
+
+        {!loading && !hasProjects && !error && (
+          <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+            <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
+              <FlaskConicalIcon className="size-[20px]" />
+            </div>
+            <div className="mt-3 text-[16px] font-medium">
+              No projects yet
+            </div>
+            <p className="text-ink-3 mt-1 max-w-[440px] text-[13px]">
+              A project owns the context for everything underneath it: feature
+              tests, runs, and the agents&apos; findings. Run onboarding to
+              seed the first one.
+            </p>
+            <Button
+              variant="accent"
+              className="mt-5"
+              onClick={() => router.push("/onboard")}
+            >
+              <PlusIcon className="size-[13px]" />
+              Create your first project
+            </Button>
+          </div>
+        )}
+
+        {hasProjects && (
+          <>
+            <div className="mb-3">
+              <CapLine>your projects</CapLine>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {projects?.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/projects/${p.id}`}
+                  className="border-border bg-card hover:border-ink-4/60 focus-visible:ring-foreground/30 flex flex-col rounded-lg border p-5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <div className="text-[15px] font-medium">{p.name}</div>
+                  <p className="text-ink-3 mt-1 line-clamp-2 text-[12.5px] leading-relaxed">
+                    {p.description}
+                  </p>
+                  <div className="text-ink-4 mt-4 flex items-center gap-3 text-[11.5px]">
+                    <span className="flex items-center gap-1">
+                      <FlaskConicalIcon className="size-[11px]" />
+                      Open feature tests
+                    </span>
+                    <span className="ml-auto inline-flex items-center gap-0.5">
+                      open
+                      <ChevronRightIcon className="size-[12px]" />
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </>

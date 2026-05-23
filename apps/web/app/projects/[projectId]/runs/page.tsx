@@ -7,7 +7,6 @@ import { ChevronRightIcon } from "lucide-react"
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
 import { RunStatusBadge } from "@/components/probe/run-status-badge"
-import { StatCard } from "@/components/probe/stat-card"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -66,21 +65,20 @@ export default function ProjectRunsPage({
   const active = runs.filter(
     (r) => !["completed", "failed"].includes(r.status),
   ).length
+  const failed = runs.filter((r) => r.status === "failed").length
+  const subtitleParts: string[] = []
+  if (active > 0) subtitleParts.push(`${active} active`)
+  subtitleParts.push(`${runs.length} total`)
+  if (failed > 0) subtitleParts.push(`${failed} failed`)
 
   return (
     <>
-      <PageHead title="Runs" sub={`Across all feature tests in ${project.name}`} />
+      <PageHead
+        title="Runs"
+        sub={`${subtitleParts.join(" · ")} · across ${project.name}`}
+      />
 
       <div className="max-w-[1200px] px-6 py-6">
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <StatCard label="Active" value={String(active)} />
-          <StatCard label="Total" value={String(runs.length)} />
-          <StatCard
-            label="Failed"
-            value={String(runs.filter((r) => r.status === "failed").length)}
-          />
-        </div>
-
         <div className="mb-3">
           <CapLine>recent runs</CapLine>
           <div className="text-ink-3 mt-0.5 text-[12px]">

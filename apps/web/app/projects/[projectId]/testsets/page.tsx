@@ -2,15 +2,12 @@
 
 import { use, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon } from "lucide-react"
+import { ChevronRightIcon, PlusIcon } from "lucide-react"
 
 import { CapLine } from "@/components/probe/cap-line"
-import { Kbd } from "@/components/probe/kbd"
 import { PageHead } from "@/components/probe/page-head"
-import { StatCard } from "@/components/probe/stat-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -21,13 +18,8 @@ import {
 } from "@/components/ui/table"
 import { getProject, listTestScenarios, useFetch } from "@/lib/api"
 import { RelativeTime } from "@/lib/format"
+import { scenarioStatusLabel, scenarioStatusTone } from "@/lib/labels"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
-
-const SCENARIO_STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  in_progress: "In progress",
-  completed: "Completed",
-}
 
 export default function TestsetsListPage({
   params,
@@ -48,6 +40,8 @@ export default function TestsetsListPage({
 
   const project = projectQ.data
   const scenarios = scenariosQ.data ?? []
+  const drafts = scenarios.filter((s) => s.status === "draft").length
+  const inProgress = scenarios.filter((s) => s.status === "in_progress").length
 
   useSetBreadcrumbs(
     project
@@ -71,56 +65,29 @@ export default function TestsetsListPage({
     return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
   }
 
+  const subtitleParts: string[] = [
+    `${scenarios.length} total`,
+    ...(drafts > 0 ? [`${drafts} draft`] : []),
+    ...(inProgress > 0 ? [`${inProgress} in progress`] : []),
+  ]
+
   return (
     <>
       <PageHead
         title="Feature tests"
-        sub={`${scenarios.length} feature test${scenarios.length === 1 ? "" : "s"} in ${project.name}`}
+        sub={`${subtitleParts.join(" · ")} · in ${project.name}`}
         actions={
-          <>
-            <div className="border-border bg-card flex h-9 items-center gap-1.5 rounded-md border px-2.5">
-              <SearchIcon className="text-ink-4 size-[13px]" />
-              <Input
-                placeholder="Search feature tests…"
-                className="h-7 w-[180px] border-0 bg-transparent px-1 text-[13px] shadow-none focus-visible:ring-0"
-              />
-              <Kbd>⌘K</Kbd>
-            </div>
-            <Button variant="ghost" size="sm">
-              <FilterIcon className="size-[13px]" />
-              Filter
-            </Button>
-            <Button
-              variant="accent"
-              onClick={() =>
-                router.push(`/projects/${project.id}/testsets/new`)
-              }
-            >
-              <PlusIcon className="size-[13px]" />
-              New feature test
-            </Button>
-          </>
+          <Button
+            variant="accent"
+            onClick={() => router.push(`/projects/${project.id}/testsets/new`)}
+          >
+            <PlusIcon className="size-[13px]" />
+            New feature test
+          </Button>
         }
       />
 
       <div className="max-w-[1200px] px-6 py-6">
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <StatCard label="Feature tests" value={String(scenarios.length)} />
-          <StatCard
-            label="Drafts"
-            value={String(scenarios.filter((s) => s.status === "draft").length)}
-          />
-        </div>
-
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <CapLine>all feature tests</CapLine>
-            <div className="text-ink-3 mt-0.5 text-[12px]">
-              click a feature test to view its brief and runs
-            </div>
-          </div>
-        </div>
-
         {scenarios.length === 0 ? (
           <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
             <div className="text-[15px] font-medium">No feature tests yet</div>
@@ -139,50 +106,63 @@ export default function TestsetsListPage({
             </Button>
           </div>
         ) : (
-          <div className="border-border bg-card overflow-hidden rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[55%]">Feature test</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scenarios.map((t) => (
-                  <TableRow
-                    key={t.id}
-                    className="cursor-pointer"
-                    onClick={() =>
-                      router.push(`/projects/${project.id}/testsets/${t.id}`)
-                    }
-                  >
-                    <TableCell>
-                      <div className="font-medium">{t.title}</div>
-                      <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
-                        {t.feature_description}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="muted">
-                        {SCENARIO_STATUS_LABEL[t.status] ?? t.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-ink-3 text-[12.5px]">
-                      <RelativeTime iso={t.created_at} />
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm">
-                        Open
-                        <ChevronRightIcon className="size-[12px]" />
-                      </Button>
-                    </TableCell>
+          <>
+            <div className="mb-3">
+              <CapLine>all feature tests</CapLine>
+              <div className="text-ink-3 mt-0.5 text-[12px]">
+                click a feature test to view its brief and runs
+              </div>
+            </div>
+            <div className="border-border bg-card overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[55%]">Feature test</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {scenarios.map((t) => {
+                    const tone = scenarioStatusTone(t.status)
+                    return (
+                      <TableRow
+                        key={t.id}
+                        className="cursor-pointer"
+                        onClick={() =>
+                          router.push(
+                            `/projects/${project.id}/testsets/${t.id}`,
+                          )
+                        }
+                      >
+                        <TableCell>
+                          <div className="font-medium">{t.title}</div>
+                          <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
+                            {t.feature_description}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={tone === "muted" ? "muted" : tone}>
+                            {scenarioStatusLabel(t.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-ink-3 text-[12.5px]">
+                          <RelativeTime iso={t.created_at} />
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm">
+                            Open
+                            <ChevronRightIcon className="size-[12px]" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
     </>
