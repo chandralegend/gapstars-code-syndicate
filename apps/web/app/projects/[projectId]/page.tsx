@@ -3,7 +3,6 @@
 import { use, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
-  ActivityIcon,
   ChevronRightIcon,
   FlaskConicalIcon,
   PlusIcon,
@@ -12,7 +11,8 @@ import {
 
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
-import { StatCard } from "@/components/probe/stat-card"
+import { RunStatusBadge } from "@/components/probe/run-status-badge"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   getProject,
@@ -21,6 +21,11 @@ import {
   useFetch,
 } from "@/lib/api"
 import { RelativeTime } from "@/lib/format"
+import {
+  isActiveRun,
+  scenarioStatusLabel,
+  scenarioStatusTone,
+} from "@/lib/labels"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 
 export default function ProjectOverviewPage({
@@ -47,7 +52,13 @@ export default function ProjectOverviewPage({
   const project = projectQ.data
   const scenarios = scenariosQ.data ?? []
   const runs = runsQ.data ?? []
-  const recentRuns = runs.length
+  const activeRuns = runs.filter((r) => isActiveRun(r.status))
+  const reviewRuns = runs.filter(
+    (r) => r.status === "agent1_review" || r.status === "agent3_review",
+  )
+  const failedRuns = runs.filter((r) => r.status === "failed")
+  const liveRun =
+    activeRuns[0] ?? reviewRuns[0] ?? null
 
   useSetBreadcrumbs(
     project
@@ -71,11 +82,27 @@ export default function ProjectOverviewPage({
     return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
   }
 
+  const subtitleParts: string[] = [
+    `${scenarios.length} feature test${scenarios.length === 1 ? "" : "s"}`,
+    ...(activeRuns.length > 0
+      ? [`${activeRuns.length} active run${activeRuns.length === 1 ? "" : "s"}`]
+      : []),
+    ...(reviewRuns.length > 0 ? [`${reviewRuns.length} awaiting review`] : []),
+    ...(failedRuns.length > 0 ? [`${failedRuns.length} failed`] : []),
+  ]
+
   return (
     <>
       <PageHead
         title={project.name}
-        sub={project.description}
+        sub={
+          <span className="block">
+            <span className="block">{project.description}</span>
+            <span className="text-ink-4 mt-1 block text-[12px]">
+              {subtitleParts.join(" · ")}
+            </span>
+          </span>
+        }
         actions={
           <>
             <Button
@@ -88,7 +115,9 @@ export default function ProjectOverviewPage({
             </Button>
             <Button
               variant="accent"
-              onClick={() => router.push(`/projects/${project.id}/testsets/new`)}
+              onClick={() =>
+                router.push(`/projects/${project.id}/testsets/new`)
+              }
             >
               <PlusIcon className="size-[13px]" />
               New feature test
@@ -98,26 +127,40 @@ export default function ProjectOverviewPage({
       />
 
       <div className="max-w-[1200px] px-6 py-6">
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <StatCard
-            label="Feature tests"
-            value={String(scenarios.length)}
-            delta={
-              scenarios.length === 0 ? "Create your first one" : "+ in this project"
+        {liveRun && (
+          <button
+            type="button"
+            onClick={() =>
+              router.push(`/projects/${project.id}/runs/${liveRun.id}`)
             }
-          />
-          <StatCard label="Runs" value={String(recentRuns)} delta="lifetime" />
-          <StatCard
-            label="Tech stack"
-            value={
-              project.tech_stack ? project.tech_stack.split(",")[0]!.trim() : "—"
-            }
-          />
-        </div>
+            className="border-border bg-card hover:border-ink-4/60 focus-visible:ring-foreground/30 mb-6 flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11.5px] font-medium tracking-wide uppercase text-ink-3">
+                  {isActiveRun(liveRun.status) ? "In progress" : "Awaiting review"}
+                </span>
+                <RunStatusBadge status={liveRun.status} />
+              </div>
+              <div className="mt-1 font-mono text-[12.5px]">
+                Run #{liveRun.id.slice(0, 8)}
+              </div>
+              <div className="text-ink-4 mt-0.5 text-[11.5px]">
+                Started <RelativeTime iso={liveRun.created_at} />
+              </div>
+            </div>
+            <span className="text-ink-3 inline-flex items-center gap-1 text-[12.5px]">
+              Open
+              <ChevronRightIcon className="size-[13px]" />
+            </span>
+          </button>
+        )}
 
         {scenarios.length === 0 ? (
           <EmptyState
-            onCreate={() => router.push(`/projects/${project.id}/testsets/new`)}
+            onCreate={() =>
+              router.push(`/projects/${project.id}/testsets/new`)
+            }
           />
         ) : (
           <>
@@ -131,9 +174,7 @@ export default function ProjectOverviewPage({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() =>
-                  router.push(`/projects/${project.id}/testsets`)
-                }
+                onClick={() => router.push(`/projects/${project.id}/testsets`)}
               >
                 See all
                 <ChevronRightIcon className="size-[12px]" />
@@ -141,51 +182,41 @@ export default function ProjectOverviewPage({
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {scenarios.slice(0, 6).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() =>
-                    router.push(`/projects/${project.id}/testsets/${t.id}`)
-                  }
-                  className="border-border bg-card hover:border-ink-4/60 group rounded-lg border p-4 text-left transition-colors"
-                >
-                  <div className="mb-1 flex items-center gap-2">
-                    <FlaskConicalIcon className="text-ink-3 size-[14px]" />
-                    <span className="text-ink-4 ml-auto font-mono text-[11px]">
-                      {t.id.slice(0, 8)}
-                    </span>
-                  </div>
-                  <div className="text-[13.5px] font-medium">{t.title}</div>
-                  <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
-                    {t.feature_description}
-                  </div>
-                  <div className="text-ink-4 mt-3 flex items-center gap-2 text-[11px]">
-                    <span>{t.status}</span>
-                    <span className="ml-auto">
+              {scenarios.slice(0, 6).map((t) => {
+                const tone = scenarioStatusTone(t.status)
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/projects/${project.id}/testsets/${t.id}`,
+                      )
+                    }
+                    className="border-border bg-card hover:border-ink-4/60 focus-visible:ring-foreground/30 group rounded-lg border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <FlaskConicalIcon className="text-ink-3 size-[14px]" />
+                      <Badge
+                        variant={tone === "muted" ? "muted" : tone}
+                        className="ml-auto"
+                      >
+                        {scenarioStatusLabel(t.status)}
+                      </Badge>
+                    </div>
+                    <div className="text-[13.5px] font-medium">{t.title}</div>
+                    <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
+                      {t.feature_description}
+                    </div>
+                    <div className="text-ink-4 mt-3 text-[11px]">
                       <RelativeTime iso={t.created_at} />
-                    </span>
-                  </div>
-                </button>
-              ))}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </>
         )}
-
-        <div className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <NavCard
-            label="Run history"
-            desc={`${runs.length} runs across this project`}
-            icon={<ActivityIcon className="size-[15px]" />}
-            onClick={() => router.push(`/projects/${project.id}/runs`)}
-          />
-          <NavCard
-            label="Settings"
-            desc="Project metadata and defaults"
-            icon={<Settings2Icon className="size-[15px]" />}
-            onClick={() => router.push(`/projects/${project.id}/settings`)}
-          />
-        </div>
       </div>
     </>
   )
@@ -207,34 +238,5 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         Create your first feature test
       </Button>
     </div>
-  )
-}
-
-function NavCard({
-  label,
-  desc,
-  icon,
-  onClick,
-}: {
-  label: string
-  desc: string
-  icon: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="border-border bg-card hover:border-ink-4/60 flex items-center gap-3 rounded-lg border p-4 text-left transition-colors"
-    >
-      <div className="bg-muted text-ink-3 grid size-9 place-items-center rounded-md">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium">{label}</div>
-        <div className="text-ink-3 mt-0.5 text-[12px]">{desc}</div>
-      </div>
-      <ChevronRightIcon className="text-ink-4 size-[14px]" />
-    </button>
   )
 }
