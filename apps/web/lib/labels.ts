@@ -2,7 +2,7 @@
  * Plain-English label helpers. Keeps every user-facing string in one place
  * so we don't leak internal node/event identifiers into the UI.
  */
-import type { RunStatus } from "@/lib/api"
+import type { RunStatus, TestScenarioStatus } from "@/lib/api"
 
 // ── Run status ──────────────────────────────────────────────────────────────
 
@@ -181,4 +181,101 @@ export function caseCategoryTitle(cat: string): string {
 
 export function caseCategoryBadge(cat: string): string {
   return CASE_CATEGORY_BADGE[cat] ?? cat
+}
+
+// ── Test scenarios (feature tests) ──────────────────────────────────────────
+
+const SCENARIO_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  in_progress: "In progress",
+  completed: "Completed",
+}
+
+const SCENARIO_STATUS_TONE: Record<string, StatusTone> = {
+  draft: "muted",
+  in_progress: "accent",
+  completed: "ok",
+}
+
+export function scenarioStatusLabel(status: TestScenarioStatus | string): string {
+  return SCENARIO_STATUS_LABEL[status] ?? status
+}
+
+export function scenarioStatusTone(status: TestScenarioStatus | string): StatusTone {
+  return SCENARIO_STATUS_TONE[status] ?? "muted"
+}
+
+// ── Phase helpers (used by the run-detail stepper) ──────────────────────────
+
+export interface PhaseStep {
+  key: "brief" | "sandbox" | "cases" | "scripts"
+  label: string
+  state: "pending" | "active" | "done"
+}
+
+/**
+ * Map the run row's status to a 4-step stepper state. We intentionally
+ * collapse the internal nodes (load_context, persist_results) into the
+ * three user-visible phases.
+ */
+export function runStepperState(
+  status: RunStatus | string,
+): PhaseStep[] {
+  const order: PhaseStep[] = [
+    { key: "brief", label: "Brief", state: "pending" },
+    { key: "sandbox", label: "Sandbox", state: "pending" },
+    { key: "cases", label: "Test cases", state: "pending" },
+    { key: "scripts", label: "Scripts", state: "pending" },
+  ]
+  const idx = (k: PhaseStep["key"]) => order.findIndex((s) => s.key === k)
+
+  switch (status) {
+    case "pending":
+    case "agent1_running":
+      order[idx("brief")]!.state = "active"
+      break
+    case "agent1_review":
+      order[idx("brief")]!.state = "active"
+      break
+    case "agent2_running":
+      order[idx("brief")]!.state = "done"
+      order[idx("sandbox")]!.state = "active"
+      break
+    case "agent3_running":
+      order[idx("brief")]!.state = "done"
+      order[idx("sandbox")]!.state = "done"
+      order[idx("cases")]!.state = "active"
+      break
+    case "agent3_review":
+      order[idx("brief")]!.state = "done"
+      order[idx("sandbox")]!.state = "done"
+      order[idx("cases")]!.state = "active"
+      break
+    case "completed":
+      order[idx("brief")]!.state = "done"
+      order[idx("sandbox")]!.state = "done"
+      order[idx("cases")]!.state = "done"
+      // The Scripts step stays pending until a bundle is generated.
+      // Callers can override it once they fetch the latest bundle.
+      break
+    case "failed":
+      // Mark the active step (if any) as pending; nothing's done past
+      // the run's current_node from the caller's perspective.
+      break
+  }
+  return order
+}
+
+/** Whether a run is actively doing work (vs queued or paused for review). */
+export function isActiveRun(status: RunStatus | string): boolean {
+  return (
+    status === "agent1_running" ||
+    status === "agent2_running" ||
+    status === "agent3_running"
+  )
+}
+
+/** Whether a run is paused waiting for a human. */
+export function isReviewPause(status: RunStatus | string): boolean {
+  return status === "agent1_review" || status === "agent3_review"
 }
