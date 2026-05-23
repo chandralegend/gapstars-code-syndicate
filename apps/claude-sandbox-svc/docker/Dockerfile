@@ -28,10 +28,20 @@ RUN pip3 install --no-cache-dir \
     "pytest-playwright>=0.5,<0.7" \
     "playwright>=1.45,<2"
 
-# Install playwright's browsers + system deps. Only chromium to keep
-# the layer modest; bundles default to chromium too.
-RUN python3 -m playwright install --with-deps chromium
+# Install playwright's system deps as root (only needed once, can't be
+# done as the unprivileged user). Then chown the browser cache dir to
+# `computeruse` and run the actual browser download as that user, so
+# the cache's .links/ entries are owned by the user that will read
+# them at execution time. Without this, a `playwright install` from
+# the bundle's run.sh hangs trying to upgrade root-owned link files.
+RUN python3 -m playwright install-deps chromium && \
+    mkdir -p /home/computeruse/.cache/ms-playwright && \
+    chown -R computeruse:computeruse /home/computeruse/.cache
 
+USER computeruse
+RUN python3 -m playwright install chromium
+
+USER root
 RUN mkdir -p /opt/runner /task && chown -R computeruse:computeruse /opt/runner /task
 
 COPY --chown=computeruse:computeruse headless.py /opt/runner/headless.py

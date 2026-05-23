@@ -20,6 +20,16 @@
 
 set -uo pipefail
 
+# Hint to any CLI tool that there's no human here so they should not
+# prompt. playwright's installer in particular will block forever on a
+# 'press enter to continue' if stdin isn't a tty; CI=1 disables that.
+export CI=1
+export PYTHONUNBUFFERED=1
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+# pytest-html / pytest-playwright / playwright write their state under
+# the user's HOME. Make sure that's set.
+export HOME="${HOME:-/home/computeruse}"
+
 BUNDLE_DIR="/task/input/bundle"
 OUT_DIR="/task/output"
 mkdir -p "$OUT_DIR"
@@ -46,8 +56,9 @@ SECONDS=0
 
 echo "[run_bundle] executing bundle/run.sh"
 # Stream stdout/stderr to both the container log and a captured file
-# so a UI tail or post-mortem inspection both work.
-bash run.sh 2>&1 | tee "$OUT_DIR/run_bundle.log"
+# so a UI tail or post-mortem inspection both work. Stdin is /dev/null
+# so any sub-process can't accidentally hang waiting for a tty prompt.
+bash run.sh </dev/null 2>&1 | tee "$OUT_DIR/run_bundle.log"
 RUN_EXIT=${PIPESTATUS[0]}
 DURATION_MS=$((SECONDS * 1000))
 
