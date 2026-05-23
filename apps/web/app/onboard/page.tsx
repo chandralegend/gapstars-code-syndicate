@@ -59,16 +59,14 @@ export default function OnboardPage() {
   }
 
   const submit = async () => {
-    if (!form.name.trim()) {
-      toast.error("Project name is required")
-      return
-    }
-    if (!form.description.trim()) {
-      toast.error("Description is required")
+    if (!form.name.trim() || !form.description.trim()) {
+      toast.error("Add a project name and description before continuing.")
+      setStep(0)
       return
     }
     if (!form.problem_statement.trim()) {
-      toast.error("Problem statement is required")
+      toast.error("A problem statement is required.")
+      setStep(1)
       return
     }
     try {
@@ -76,7 +74,9 @@ export default function OnboardPage() {
       toast.success("Project created")
       router.push(`/projects/${project.id}`)
     } catch (e) {
-      toast.error(`Failed to create: ${e instanceof Error ? e.message : e}`)
+      toast.error(
+        `Could not create project: ${e instanceof Error ? e.message : e}`,
+      )
     }
   }
 

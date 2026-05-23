@@ -1011,7 +1011,8 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                             {String(s.action ?? "")}
                             {typeof s.expected === "string" && (
                               <span className="text-ink-4">
-                                {" "}— {String(s.expected)}
+                                {": "}
+                                {String(s.expected)}
                               </span>
                             )}
                           </li>
