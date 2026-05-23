@@ -3,6 +3,9 @@
  *
  * Renders a relative phrase ("2 min ago") with the absolute timestamp as
  * the `title` attribute so users can hover to see the precise time.
+ *
+ * All `<RelativeTime/>` instances share one 30s ticker via a module-level
+ * pub/sub so we don't pay one setInterval per row in tables and lists.
  */
 "use client"
 
@@ -27,7 +30,6 @@ export function formatRelative(input: string | Date | number): string {
   if (abs < HOUR) return pick(Math.round(abs / MINUTE), "min")
   if (abs < DAY) return pick(Math.round(abs / HOUR), "hour")
   if (abs < 7 * DAY) return pick(Math.round(abs / DAY), "day")
-  // Older than a week — fall back to absolute date.
   return new Date(ts).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -57,7 +59,34 @@ export function formatDuration(ms: number): string {
   return `${m}m ${r}s`
 }
 
-/** Tiny component that re-renders every minute so "2 min ago" stays fresh. */
+// ── Shared ticker ──────────────────────────────────────────────────────────
+//
+// One setInterval, many subscribers. The 30s cadence is fine for
+// "X min ago" granularity; finer-grained countdowns own their own timer.
+
+const tickerSubscribers = new Set<() => void>()
+let tickerHandle: ReturnType<typeof setInterval> | null = null
+
+function subscribeTicker(cb: () => void): () => void {
+  tickerSubscribers.add(cb)
+  if (tickerHandle === null) {
+    tickerHandle = setInterval(() => {
+      for (const fn of tickerSubscribers) fn()
+    }, 30_000)
+  }
+  return () => {
+    tickerSubscribers.delete(cb)
+    if (tickerSubscribers.size === 0 && tickerHandle !== null) {
+      clearInterval(tickerHandle)
+      tickerHandle = null
+    }
+  }
+}
+
+/**
+ * Re-renders every ~30 seconds so 'X min ago' stays fresh. Subscribes to
+ * a shared interval so a list of 50 rows costs one timer, not 50.
+ */
 export function RelativeTime({
   iso,
   className,
@@ -67,8 +96,7 @@ export function RelativeTime({
 }) {
   const [, force] = useState(0)
   useEffect(() => {
-    const t = setInterval(() => force((n) => n + 1), 60_000)
-    return () => clearInterval(t)
+    return subscribeTicker(() => force((n) => n + 1))
   }, [])
   if (!iso) return <span className={className}>—</span>
   return (
