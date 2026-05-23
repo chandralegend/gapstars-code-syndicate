@@ -1,37 +1,48 @@
 # Sandbox image for claude-sandbox-svc.
 #
-# Extends Anthropic's Computer Use reference image with a headless entrypoint
-# that reads /task/input.json, runs computer_use_demo.loop.sampling_loop, and
-# writes /task/output/{result.json,error.json,trace.jsonl,screenshots/...}.
+# Extends Anthropic's Computer Use reference image with two entrypoints:
+#  1. Headless agent loop (kind=exploration): the original computer-use
+#     loop that reads /task/input.json and writes /task/output/...
+#  2. Bundle execution (kind=execution): runs /task/input/bundle/run.sh
+#     and captures /task/input/bundle/reports/ into /task/output/.
 #
-# We keep the upstream X11 + noVNC stack so the live view still works, but we
-# do NOT start Streamlit or the upstream http_server.
+# Which path runs is decided by the TASK_KIND env var, dispatched in
+# entrypoint.sh. Defaults to "exploration" for back-compat.
 
 FROM ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
 
 USER computeruse
 WORKDIR /home/computeruse
 
-# Headless entrypoint scripts live under /opt/runner.
-# Use sudo (NOPASSWD is configured in the base image) to write outside $HOME.
+# Test execution dependencies. We install pytest + playwright (Python
+# bindings + browser drivers) so Agent 4's pytest-flavoured bundles
+# can run without any extra setup at execution time.
+#
+# pytest-html gives us a default HTML report alongside the JUnit XML.
+# pytest-playwright wires up the page fixture so generated tests can
+# `def test_*(page):` straight away.
 USER root
+RUN pip3 install --no-cache-dir \
+    "pytest>=8.0,<9" \
+    "pytest-html>=4.1,<5" \
+    "pytest-playwright>=0.5,<0.7" \
+    "playwright>=1.45,<2"
+
+# Install playwright's browsers + system deps. Only chromium to keep
+# the layer modest; bundles default to chromium too.
+RUN python3 -m playwright install --with-deps chromium
+
 RUN mkdir -p /opt/runner /task && chown -R computeruse:computeruse /opt/runner /task
 
 COPY --chown=computeruse:computeruse headless.py /opt/runner/headless.py
+COPY --chown=computeruse:computeruse run_bundle.sh /opt/runner/run_bundle.sh
 COPY --chown=computeruse:computeruse entrypoint.sh /opt/runner/entrypoint.sh
-RUN chmod +x /opt/runner/entrypoint.sh
+RUN chmod +x /opt/runner/entrypoint.sh /opt/runner/run_bundle.sh
 
 USER computeruse
 
-# /task is the bind-mount point for per-task input/output. The host service
-# mounts data/tasks/{task_id}/ here.
 VOLUME ["/task"]
 
-# Ports kept from the base image:
-#  5900 - VNC
-#  6080 - noVNC web client (this is what we expose to the user)
-#  8501 - (unused; Streamlit not started)
-#  8080 - (unused; combined view not started)
 EXPOSE 5900 6080
 
 ENTRYPOINT ["/opt/runner/entrypoint.sh"]

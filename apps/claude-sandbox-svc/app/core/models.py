@@ -21,6 +21,11 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class TaskKind(str, Enum):
+    EXPLORATION = "exploration"
+    EXECUTION = "execution"
+
+
 TERMINAL_STATUSES = {
     TaskStatus.SUCCEEDED,
     TaskStatus.FAILED,
@@ -42,6 +47,11 @@ class Task(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     status: Mapped[str] = mapped_column(String(16), default=TaskStatus.QUEUED.value, index=True)
+    # Default 'exploration' so old rows (pre-execution feature) keep
+    # behaving like before.
+    kind: Mapped[str] = mapped_column(
+        String(16), default=TaskKind.EXPLORATION.value, index=True, server_default=TaskKind.EXPLORATION.value
+    )
 
     prompt: Mapped[str] = mapped_column(Text)
     model: Mapped[str] = mapped_column(String(64))
@@ -69,6 +79,16 @@ class TaskCreate(BaseModel):
     """Body of POST /tasks (sent as the JSON `data` part of multipart/form-data)."""
 
     prompt: str = Field(..., min_length=1)
+    # Defaults to exploration so existing API consumers keep working.
+    # `execution` requires `source_task_id` to point at the bundle to run.
+    kind: TaskKind = Field(default=TaskKind.EXPLORATION)
+    source_task_id: str | None = Field(
+        default=None,
+        description=(
+            "When kind=execution, the task whose output/workspace/ contains the "
+            "bundle to execute. Required for execution tasks; ignored otherwise."
+        ),
+    )
     model: str | None = None
     system_prompt_suffix: str | None = None
     max_iterations: int = Field(default=50, ge=1, le=500)
@@ -84,6 +104,7 @@ class TaskCreate(BaseModel):
 class TaskResponse(BaseModel):
     id: str
     status: TaskStatus
+    kind: TaskKind
     prompt: str
     model: str
     created_at: datetime
@@ -103,6 +124,7 @@ class TaskResponse(BaseModel):
         return cls(
             id=task.id,
             status=TaskStatus(task.status),
+            kind=TaskKind(task.kind),
             prompt=task.prompt,
             model=task.model,
             created_at=task.created_at,

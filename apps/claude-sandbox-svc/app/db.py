@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
@@ -23,11 +23,33 @@ _engine = None
 _SessionLocal: sessionmaker[Session] | None = None
 
 
+def _migrate_in_place(engine) -> None:
+    """Hand-rolled lightweight migrations for SQLite.
+
+    We don't run alembic here; the schema is small. Each migration step
+    is an idempotent ``IF NOT EXISTS`` style nudge.
+    """
+    insp = inspect(engine)
+    if "tasks" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("tasks")}
+    with engine.begin() as conn:
+        if "kind" not in cols:
+            # Default to exploration so old rows behave like before.
+            conn.execute(
+                text(
+                    "ALTER TABLE tasks ADD COLUMN kind VARCHAR(16) "
+                    "NOT NULL DEFAULT 'exploration'"
+                )
+            )
+
+
 def init_db() -> None:
     global _engine, _SessionLocal
     if _engine is None:
         _engine = _make_engine()
         Base.metadata.create_all(_engine)
+        _migrate_in_place(_engine)
         _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False, autoflush=False)
 
 

@@ -133,6 +133,11 @@ class TaskRunner:
                 return
             user_env = dict(task.spec.get("env") or {})
             timeout = task.timeout_seconds
+            kind = task.kind
+
+        # Inject the task kind so the container's entrypoint can
+        # dispatch (exploration vs execution).
+        user_env["TASK_KIND"] = kind
 
         # Verify image exists
         try:

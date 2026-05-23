@@ -85,6 +85,34 @@ def workspace_dir(task_id: str) -> Path:
     return output_dir(task_id) / "workspace"
 
 
+def bundle_dir(task_id: str) -> Path:
+    """Where execution-kind tasks expect to read their bundle from.
+
+    Inside the running container this maps to ``/task/input/bundle/``;
+    `run_bundle.sh` cd's into it and runs ``./run.sh``.
+    """
+    return input_dir(task_id) / "bundle"
+
+
+def copy_bundle_from_source(source_task_id: str, dest_task_id: str) -> Path:
+    """Copy a source task's ``output/workspace/`` into the destination
+    task's ``input/bundle/`` so a fresh container can find it at the
+    canonical bundle path.
+
+    Returns the destination directory. Raises ``FileNotFoundError`` if
+    the source workspace doesn't exist (the caller turns that into a
+    400/404 for the API consumer).
+    """
+    src = workspace_dir(source_task_id)
+    if not src.exists():
+        raise FileNotFoundError(
+            f"source workspace not found for task {source_task_id}"
+        )
+    dest = bundle_dir(dest_task_id)
+    shutil.copytree(src, dest, dirs_exist_ok=True)
+    return dest
+
+
 def build_workspace_zip(task_id: str) -> bytes | None:
     """Zip up everything Claude wrote under output/workspace/.
 

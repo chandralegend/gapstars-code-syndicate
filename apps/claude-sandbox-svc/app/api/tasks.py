@@ -14,7 +14,14 @@ from sqlalchemy import select
 
 from app.core import storage, tokens
 from app.core.config import get_settings
-from app.core.models import Task, TaskCreate, TaskResponse, TaskStatus, TERMINAL_STATUSES
+from app.core.models import (
+    Task,
+    TaskCreate,
+    TaskKind,
+    TaskResponse,
+    TaskStatus,
+    TERMINAL_STATUSES,
+)
 from app.core.validation import EnvValidationError, validate_user_env
 from app.db import session_scope
 
@@ -80,8 +87,42 @@ async def create_task(
     except EnvValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+    # Execution kind requires a source task whose workspace holds the
+    # bundle to run. Reject early if it's missing or unknown so we
+    # don't waste a task slot on a doomed run.
+    if spec.kind == TaskKind.EXECUTION:
+        if not spec.source_task_id:
+            raise HTTPException(
+                status_code=400,
+                detail="kind=execution requires source_task_id",
+            )
+        with session_scope() as db:
+            src = db.get(Task, spec.source_task_id)
+        if src is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"source task {spec.source_task_id} not found",
+            )
+        if not (storage.workspace_dir(spec.source_task_id)).exists():
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"source task {spec.source_task_id} has no workspace; "
+                    "the bundle is missing"
+                ),
+            )
+
     task_id = str(uuid.uuid4())
     storage.init_task_layout(task_id)
+
+    # For execution tasks we copy the source workspace into this task's
+    # input/bundle/ before queueing. The runner cd's into it and runs
+    # ./run.sh.
+    if spec.kind == TaskKind.EXECUTION and spec.source_task_id:
+        try:
+            storage.copy_bundle_from_source(spec.source_task_id, task_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Save uploaded files
     if files:
@@ -108,12 +149,14 @@ async def create_task(
         task = Task(
             id=task_id,
             status=TaskStatus.QUEUED.value,
+            kind=spec.kind.value,
             prompt=spec.prompt,
             model=runner_input["model"],
             spec={
                 "env": sanitized_env,
                 "max_iterations": spec.max_iterations,
                 "tool_version": spec.tool_version,
+                "source_task_id": spec.source_task_id,
             },
             timeout_seconds=spec.timeout_seconds,
         )
