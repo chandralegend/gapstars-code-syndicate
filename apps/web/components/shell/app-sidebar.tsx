@@ -2,7 +2,7 @@
 
 import { useCallback } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import {
   ActivityIcon,
   ChevronLeftIcon,
@@ -18,7 +18,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -96,7 +95,6 @@ function projectIdFromPath(pathname: string): string | null {
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const router = useRouter()
 
   const projectId = projectIdFromPath(pathname)
   const projectQ = useFetch(
@@ -119,8 +117,14 @@ export function AppSidebar() {
         <SidebarMenuItem key={`${it.href}-${it.label}`}>
           <SidebarMenuButton
             isActive={active}
-            onClick={() => router.push(it.href)}
             tooltip={it.label}
+            render={
+              <Link
+                href={it.href}
+                aria-current={active ? "page" : undefined}
+                prefetch
+              />
+            }
             className={cn(
               "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
               "hover:bg-sidebar-accent/70",
@@ -160,7 +164,10 @@ export function AppSidebar() {
             href="/projects"
             className="bg-sidebar-accent/60 border-sidebar-border hover:bg-sidebar-accent group/proj mt-1 flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left group-data-[state=collapsed]:hidden"
           >
-            <span className="grid size-[22px] place-items-center rounded-[5px] bg-gradient-to-br from-[oklch(0.65_0.15_200)] to-[oklch(0.55_0.15_280)] font-mono text-[11px] font-semibold text-white">
+            <span
+              aria-hidden
+              className="bg-sidebar-accent text-accent-ink border-sidebar-border grid size-[24px] place-items-center rounded-[5px] border font-mono text-[10.5px] font-semibold tracking-tight"
+            >
               {project.name.slice(0, 2).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
@@ -185,9 +192,6 @@ export function AppSidebar() {
 
         {project && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/55 text-[10.5px] tracking-[0.08em] uppercase">
-              {project.name}
-            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>{renderNav(projectNav)}</SidebarMenu>
             </SidebarGroupContent>
