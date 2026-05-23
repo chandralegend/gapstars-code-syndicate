@@ -196,8 +196,11 @@ async def _run(run_id: uuid.UUID, execution_id: uuid.UUID) -> None:
         result_json_text = await _safe_read(
             sandbox, task_id, "output/result.json"
         )
+        # JUnit XML can be large (1MB+ for 25+ tests with traces).
+        # Use a generous cap so we never truncate it.
         junit_text = await _safe_read(
-            sandbox, task_id, "output/reports/junit.xml"
+            sandbox, task_id, "output/reports/junit.xml",
+            max_bytes=8 * 1024 * 1024,
         )
         # Enumerate screenshot files so we can wire them to per-test rows.
         screenshot_paths = await _list_screenshots(sandbox, task_id)
@@ -398,10 +401,13 @@ async def _list_screenshots(
 
 
 async def _safe_read(
-    sandbox: SandboxClient, task_id: str, path: str
+    sandbox: SandboxClient, task_id: str, path: str,
+    max_bytes: int = 256 * 1024,
 ) -> str | None:
     try:
-        return await sandbox.read_artifact_text(task_id, path)
+        return await sandbox.read_artifact_text(
+            task_id, path, max_bytes=max_bytes
+        )
     except SandboxError as exc:
         logger.warning("could not read %s for task %s: %s", path, task_id, exc)
         return None
@@ -455,9 +461,36 @@ def _interpret_artifacts(
     return summary, per_test
 
 
-def _nodeid_to_screenshot_key(nodeid: str) -> str:
-    """Mirror the conftest hook: re.sub(r'[^\\w.-]', '_', nodeid)."""
-    return re.sub(r"[^\w.-]", "_", nodeid)
+def _nodeid_to_screenshot_key(nodeid: str) -> list[str]:
+    """Return candidate screenshot key stems for a given JUnit test id.
+
+    The conftest hook uses ``re.sub(r'[^\\w.-]', '_', item.nodeid)`` where
+    ``item.nodeid`` is the pytest node id in path form:
+      ``tests/test_foo.py::test_bar[chromium]``
+
+    JUnit XML ``classname`` uses module notation:
+      ``tests.test_foo``
+
+    We generate both forms so we match regardless of what the agent
+    wrote in the classname.
+    """
+    # Form 1: direct sanitise (works when classname is already path-like)
+    key1 = re.sub(r"[^\w.-]", "_", nodeid)
+
+    # Form 2: convert dotted classname to path form
+    # 'tests.test_foo::test_bar[chromium]' ->
+    # 'tests/test_foo.py::test_bar[chromium]'
+    if "::" in nodeid:
+        classname, rest = nodeid.split("::", 1)
+        # dots to slashes, last segment gets .py
+        parts = classname.split(".")
+        path_class = "/".join(parts) + ".py"
+        path_nodeid = f"{path_class}::{rest}"
+        key2 = re.sub(r"[^\w.-]", "_", path_nodeid)
+    else:
+        key2 = key1
+
+    return list(dict.fromkeys([key1, key2]))  # deduplicated, order preserved
 
 
 def _parse_junit_per_test(
@@ -516,8 +549,10 @@ def _parse_junit_per_test(
 
             # Match screenshot for failed/errored tests.
             if outcome in (TestOutcome.FAILED.value, TestOutcome.ERRORED.value):
-                key = _nodeid_to_screenshot_key(test_id)
-                screenshot_path = screenshot_index.get(key)
+                for key in _nodeid_to_screenshot_key(test_id):
+                    if key in screenshot_index:
+                        screenshot_path = screenshot_index[key]
+                        break
 
             rows.append(
                 {

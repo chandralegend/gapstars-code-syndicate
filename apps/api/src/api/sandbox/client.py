@@ -178,12 +178,12 @@ class SandboxClient:
         task_id: str,
         path: str,
         *,
-        max_bytes: int = 256 * 1024,
+        max_bytes: int = 2 * 1024 * 1024,
     ) -> str | None:
         """Fetch a text artifact under the task directory.
 
         Returns ``None`` if the artifact is missing. Truncates the body at
-        ``max_bytes`` to keep node memory bounded.
+        ``max_bytes`` to keep memory bounded.
         """
         try:
             response = await self._client.get(f"/tasks/{task_id}/artifacts/{path}")

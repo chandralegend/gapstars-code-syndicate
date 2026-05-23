@@ -144,27 +144,35 @@ inline Python script, then ``exit 0``.
 
 ``test_cases[].id`` MUST equal the input UUID exactly.
 
-## Forbidden
+## Test file strategy — IMPORTANT
 
-- Relative imports in any test file.
-- Re-defining ``browser``, ``context``, or ``page`` fixtures.
-- ``tests/__init__.py``.
-- Tests that depend on internet access unless the case explicitly
-  requires it.
-- Multiple entrypoints.
-- Documentation-only output — test code is required.
+The file-create tool has a size limit. If you have more than 8 test
+cases, you MUST split them across multiple files:
+
+  tests/test_happy_paths.py     — happy path cases (≤8 tests)
+  tests/test_edge_cases.py      — edge case cases (≤8 tests)
+  tests/test_corner_cases.py    — corner cases (≤8 tests)
+
+Never put more than 8 test functions in a single file. If the total
+number of approved cases exceeds 24, pick the 24 most important ones
+and note the others were skipped in README.md.
+
+Use separate ``str_replace_based_edit_tool create`` calls for each
+file. Each call must fully contain that file's tests — do not split
+a single test function across multiple calls.
 
 ## Process
 
 1. Read project context, feature expectation, and approved test cases.
 2. Create ``tests/conftest.py`` with the screenshot hook first.
-3. Author one test function per approved case. Each function name must
-   contain the short test-case title (snake_cased) so failures are
-   easy to identify.
-4. Write ``run.sh`` last — use the exact pytest invocation above.
-5. Write ``manifest.json`` and ``README.md``.
-6. Run ``ls -la /task/output/workspace/tests/`` to verify no
-   ``__init__.py`` crept in and all test files are present.
+3. Write ``run.sh`` IMMEDIATELY after conftest.py — before any test files.
+   A partial bundle with run.sh is recoverable; one without is not.
+4. Write ``manifest.json`` right after run.sh.
+5. Author test files — split into ≤8 tests per file (see "Test file strategy"
+   above). Use separate tool calls for each file:
+   tests/test_happy_paths.py, tests/test_edge_cases.py, etc.
+6. Run ``ls -la /task/output/workspace/tests/`` to verify all test files
+   are present and no ``__init__.py`` crept in.
 7. End your turn with a one-sentence plain-text summary.
 
 Stay strictly within ``/task/output/workspace/``. Do not write
@@ -188,7 +196,7 @@ You are generating a runnable test-script bundle for a QA team. Read the
 sections below, pick a single test framework, and produce the bundle
 under ``/task/output/workspace/`` per the strict system-prompt contract.
 
-Move quickly — aim to finish in under 5 minutes. No screenshots of your
+Move quickly — aim to finish in under 15 minutes. No screenshots of your
 own work; the conftest hook handles test-failure screenshots.
 
 ## Project context

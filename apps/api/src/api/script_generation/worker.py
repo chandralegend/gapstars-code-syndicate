@@ -47,8 +47,8 @@ logger = logging.getLogger(__name__)
 
 # Limits roughly mirroring Agent 2's safety net.
 _MAX_CONSECUTIVE_POLL_ERRORS = 10
-_BUNDLE_TIMEOUT_SECONDS = 600  # 10 minutes; longer than Agent 2's 360s
-_BUNDLE_MAX_ITERATIONS = 30
+_BUNDLE_TIMEOUT_SECONDS = 1200  # 20 minutes — Agent 4 writes many files for large test suites
+_BUNDLE_MAX_ITERATIONS = 60     # Allow enough iterations to write all test files + run.sh + manifest
 
 
 async def run_script_generation(run_id: uuid.UUID, bundle_id: uuid.UUID) -> None:
