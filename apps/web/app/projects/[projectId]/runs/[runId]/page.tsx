@@ -731,10 +731,16 @@ function RightPanel({
         ? "cases"
         : "brief"
 
+  // The right pane is wider than its content needs to be on big
+  // monitors. We keep the chrome (header, tabs underline, review bar)
+  // edge-to-edge but cap the *content* on a centered rail so prose
+  // and forms stay readable.
+  const rail = "mx-auto w-full max-w-[880px]"
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-border border-b px-6 py-3.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className={cn(rail, "flex flex-wrap items-center gap-x-3 gap-y-2")}>
           <div className="min-w-0">
             <div className="text-[15px] font-semibold">{runPhaseTitle(status)}</div>
             <div className="text-ink-3 text-[12px]">
@@ -751,7 +757,9 @@ function RightPanel({
 
       {sandboxRunning && (
         <div className="border-border border-b bg-muted/30 px-6 py-4">
-          <LiveScreenView runId={runId} runStatus={status} />
+          <div className={rail}>
+            <LiveScreenView runId={runId} runStatus={status} />
+          </div>
         </div>
       )}
 
@@ -761,102 +769,114 @@ function RightPanel({
           className="flex min-h-0 flex-1 flex-col"
         >
           <TabsList className="border-border h-auto justify-start gap-1 rounded-none border-b bg-transparent px-6 py-0">
-            <Tab value="brief">Brief {fe ? `· v${fe.version}` : ""}</Tab>
-            <Tab value="cases">
-              Test cases
-              {cases.length > 0 && (
-                <span className="bg-muted text-ink-3 ml-1.5 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
-                  {cases.length}
-                </span>
-              )}
-            </Tab>
-            {sandboxStarted && (
-              <Tab value="sandbox">
-                {sandboxRunning ? "Sandbox details" : "Sandbox activity"}
+            <div className={cn(rail, "flex items-center gap-1")}>
+              <Tab value="brief">Brief {fe ? `· v${fe.version}` : ""}</Tab>
+              <Tab value="cases">
+                Test cases
+                {cases.length > 0 && (
+                  <span className="bg-muted text-ink-3 ml-1.5 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+                    {cases.length}
+                  </span>
+                )}
               </Tab>
-            )}
-            {status === "completed" && (
-              <Tab value="scripts">Test scripts</Tab>
-            )}
+              {sandboxStarted && (
+                <Tab value="sandbox">
+                  {sandboxRunning ? "Sandbox details" : "Sandbox activity"}
+                </Tab>
+              )}
+              {status === "completed" && (
+                <Tab value="scripts">Test scripts</Tab>
+              )}
+            </div>
           </TabsList>
 
           <TabsContent value="brief" className="px-6 py-5">
-            {fe ? (
-              <FeaturePanel fe={fe} />
-            ) : (
-              <div className="text-ink-3 text-[13px]">
-                {showReviewBar
-                  ? "Loading the brief…"
-                  : "The brief will appear here once Agent 1 finishes drafting it."}
-              </div>
-            )}
+            <div className={rail}>
+              {fe ? (
+                <FeaturePanel fe={fe} />
+              ) : (
+                <div className="text-ink-3 text-[13px]">
+                  {showReviewBar
+                    ? "Loading the brief…"
+                    : "The brief will appear here once Agent 1 finishes drafting it."}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="cases" className="px-6 py-5">
-            {cases.length > 0 ? (
-              <CasesPanel cases={cases} />
-            ) : (
-              <div className="text-ink-3 text-[13px]">
-                {status === "completed" || status === "agent3_review"
-                  ? "No test cases yet."
-                  : "Test cases will appear once Agent 3 generates them."}
-              </div>
-            )}
+            <div className={rail}>
+              {cases.length > 0 ? (
+                <CasesPanel cases={cases} />
+              ) : (
+                <div className="text-ink-3 text-[13px]">
+                  {status === "completed" || status === "agent3_review"
+                    ? "No test cases yet."
+                    : "Test cases will appear once Agent 3 generates them."}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           {sandboxStarted && (
             <TabsContent value="sandbox" className="px-6 py-5">
-              <SandboxPanel
-                runId={runId}
-                runStatus={status}
-                hideLiveView={sandboxRunning}
-              />
+              <div className={rail}>
+                <SandboxPanel
+                  runId={runId}
+                  runStatus={status}
+                  hideLiveView={sandboxRunning}
+                />
+              </div>
             </TabsContent>
           )}
 
           {status === "completed" && (
             <TabsContent value="scripts" className="px-6 py-5">
-              <ScriptsPanel runId={runId} />
+              <div className={rail}>
+                <ScriptsPanel runId={runId} />
+              </div>
             </TabsContent>
           )}
         </Tabs>
       </div>
 
       {showReviewBar && (
-        <div className="border-warn/40 bg-warn-soft/40 space-y-2 border-t px-6 py-3.5">
-          <div className="text-warn-ink flex items-center gap-1.5 text-[12px] font-medium">
-            <AlertTriangleIcon className="size-[12px]" />
-            This run is paused. Review the {reviewKind === "brief" ? "brief" : "test cases"} above and approve or request changes.
-          </div>
-          <Textarea
-            placeholder="Tell the agent what to change (only required if you request changes)."
-            value={feedbackText}
-            onChange={(e) => onFeedbackTextChange(e.target.value)}
-            className="min-h-[60px] resize-none text-[13px]"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink-4 text-[11px]">
-              Approve to continue. Request changes loops the agent back.
-            </span>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={submitting}
-                onClick={() => onSubmit("revise")}
-              >
-                <SendIcon className="size-[13px]" />
-                Request changes
-              </Button>
-              <Button
-                variant="accent"
-                size="sm"
-                disabled={submitting}
-                onClick={() => onSubmit("approve")}
-              >
-                <CheckIcon className="size-[13px]" />
-                Approve & continue
-              </Button>
+        <div className="border-warn/40 bg-warn-soft/40 border-t px-6 py-3.5">
+          <div className={cn(rail, "space-y-2")}>
+            <div className="text-warn-ink flex items-center gap-1.5 text-[12px] font-medium">
+              <AlertTriangleIcon className="size-[12px]" />
+              This run is paused. Review the {reviewKind === "brief" ? "brief" : "test cases"} above and approve or request changes.
+            </div>
+            <Textarea
+              placeholder="Tell the agent what to change (only required if you request changes)."
+              value={feedbackText}
+              onChange={(e) => onFeedbackTextChange(e.target.value)}
+              className="min-h-[60px] resize-none text-[13px]"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-ink-4 text-[11px]">
+                Approve to continue. Request changes loops the agent back.
+              </span>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={submitting}
+                  onClick={() => onSubmit("revise")}
+                >
+                  <SendIcon className="size-[13px]" />
+                  Request changes
+                </Button>
+                <Button
+                  variant="accent"
+                  size="sm"
+                  disabled={submitting}
+                  onClick={() => onSubmit("approve")}
+                >
+                  <CheckIcon className="size-[13px]" />
+                  Approve & continue
+                </Button>
+              </div>
             </div>
           </div>
         </div>
