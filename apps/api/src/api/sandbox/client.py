@@ -70,12 +70,19 @@ class SandboxClient:
         timeout_seconds: int = 1800,
         max_iterations: int = 50,
         env: dict[str, str] | None = None,
+        kind: str = "exploration",
+        source_task_id: str | None = None,
     ) -> str:
         """Create a sandbox task and return its id.
 
         The body is sent as ``multipart/form-data`` because that's what
         ``POST /tasks`` requires (it accepts file uploads alongside the JSON
         ``data`` part). We send only the JSON part.
+
+        ``kind`` selects the runner mode inside the container.
+        ``execution`` requires ``source_task_id`` to point at the task whose
+        ``output/workspace/`` holds the bundle to run; sandbox-svc copies
+        that bundle into the new task's ``input/bundle/`` before queueing.
         """
         spec: dict[str, Any] = {
             "prompt": prompt,
@@ -83,9 +90,12 @@ class SandboxClient:
             "timeout_seconds": timeout_seconds,
             "max_iterations": max_iterations,
             "env": env or {},
+            "kind": kind,
         }
         if model:
             spec["model"] = model
+        if source_task_id is not None:
+            spec["source_task_id"] = source_task_id
 
         # `data` is the JSON-encoded TaskCreate body, sent as a form field.
         response = await self._client.post(

@@ -222,6 +222,21 @@ async def _run(run_id: uuid.UUID, bundle_id: uuid.UUID) -> None:
             },
         )
 
+    # Auto-trigger: kick off a fresh execution against the bundle we
+    # just saved. Imported lazily to avoid an import cycle (the
+    # test_execution worker depends on test_script_bundle_service,
+    # which is also in api.services).
+    from api.test_execution import queue_auto_execution
+
+    try:
+        await queue_auto_execution(run_id, bundle_id)
+    except Exception:
+        # Auto-execution should never block the script-gen worker. The
+        # user can retry manually via POST /runs/:id/executions.
+        logger.exception(
+            "could not queue auto-execution for bundle %s", bundle_id
+        )
+
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -18,6 +18,7 @@ from api.routers import (
     providers_router,
     runs_router,
     sandbox_artifacts_router,
+    test_executions_router,
     test_scenarios_router,
     test_scripts_router,
 )
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(runs_router)
     app.include_router(sandbox_artifacts_router)
     app.include_router(test_scripts_router)
+    app.include_router(test_executions_router)
 
     # ── Health ────────────────────────────────────────────────────────────────
     @app.get("/api/health", tags=["health"])
