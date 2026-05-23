@@ -6,6 +6,7 @@ Surface:
   GET    /api/runs/:id/executions          -- list, most recent first
   GET    /api/runs/:id/executions/latest   -- shortcut
   GET    /api/executions/:id               -- detail (includes per-test rows)
+  DELETE /api/executions/:id               -- cancel a queued/running execution
   GET    /api/executions/:id/artifacts/{path:path}  -- proxied screenshot etc.
 
 Auto-triggered executions are created by the script-generation worker;
@@ -142,6 +143,60 @@ async def get_execution(
         **TestExecutionRead.model_validate(execution).model_dump(),
         results=[TestExecutionResultRead.model_validate(r) for r in results],
     )
+
+
+# ── Cancel ──────────────────────────────────────────────────────────────────
+
+
+@router.delete(
+    "/executions/{execution_id}",
+    response_model=TestExecutionRead,
+    status_code=200,
+)
+async def cancel_execution(
+    execution_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> TestExecutionRead:
+    """Cancel a queued or running execution.
+
+    Sends a cancel request to sandbox-svc (best-effort; the task may have
+    already finished by the time we get there) and marks the execution as
+    ``errored`` immediately so the UI stops showing it as in-flight.
+    Returns 409 if the execution is already in a terminal state.
+    """
+    execution = await test_execution_service.get_by_id(session, execution_id)
+    if execution is None:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    terminal_statuses = {"passed", "failed", "errored"}
+    if execution.status in terminal_statuses:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Execution is already {execution.status}; cannot cancel.",
+        )
+
+    # Best-effort cancel in sandbox-svc.
+    if execution.sandbox_task_id:
+        async with SandboxClient(settings.sandbox_base_url) as sandbox:
+            try:
+                await sandbox.cancel_task(execution.sandbox_task_id)
+            except SandboxError as exc:
+                # Log but don't fail the request — we still mark it errored.
+                import logging
+                logging.getLogger(__name__).warning(
+                    "sandbox cancel failed for task %s: %s",
+                    execution.sandbox_task_id,
+                    exc,
+                )
+
+    updated = await test_execution_service.update_status(
+        session,
+        execution_id,
+        "errored",
+        error="Cancelled by user",
+        ended=True,
+    )
+    return TestExecutionRead.model_validate(updated)
 
 
 # ── Artifact proxy ──────────────────────────────────────────────────────────

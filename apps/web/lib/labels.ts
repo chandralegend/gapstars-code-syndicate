@@ -145,6 +145,7 @@ const EVENT_LABEL: Record<string, string> = {
   script_bundle_failed: "Test-script generation failed",
   test_execution_started: "Running tests",
   test_execution_progress: "Test execution progress",
+  test_execution_test_outcome: "Test result",
   test_execution_succeeded: "All tests passed",
   test_execution_failed: "Some tests failed",
   test_execution_errored: "Could not run tests",
@@ -245,6 +246,12 @@ export function eventSummary(
       if (s === "failed") return "Tests stopped"
       return null
     }
+    case "test_execution_test_outcome": {
+      const tid = typeof p.test_id === "string" ? p.test_id.split("::").pop() : null
+      const oc = String(p.outcome ?? "")
+      if (tid) return `${tid} — ${oc}`
+      return oc || null
+    }
     case "test_execution_succeeded":
     case "test_execution_failed": {
       const summary = (p.summary ?? {}) as Record<string, unknown>
@@ -303,6 +310,16 @@ export function shouldShowEvent(
       (l) => l.type === "sandbox_task_progress",
     )
     if (laterProgress) return false
+  }
+
+  // Per-test outcomes stream in during execution. Once a final
+  // test_execution_succeeded/_failed/_errored arrives, hide the
+  // intermediate outcome events — the results tab shows them properly.
+  if (e.type === "test_execution_test_outcome") {
+    const hasFinal = laterEvents.some((l) =>
+      ["test_execution_succeeded", "test_execution_failed", "test_execution_errored"].includes(l.type),
+    )
+    if (hasFinal) return false
   }
 
   return true

@@ -397,6 +397,16 @@ export async function createTestExecution(
   )
 }
 
+export async function cancelTestExecution(
+  executionId: string,
+): Promise<TestExecution> {
+  return unwrap(
+    await apiClient.DELETE("/api/executions/{execution_id}", {
+      params: { path: { execution_id: executionId } },
+    }),
+  )
+}
+
 /**
  * Direct URL to a per-execution artifact (typically a screenshot under
  * output/reports/screenshots/...). Bypasses the client envelope so it

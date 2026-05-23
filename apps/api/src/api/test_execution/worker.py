@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -198,9 +199,13 @@ async def _run(run_id: uuid.UUID, execution_id: uuid.UUID) -> None:
         junit_text = await _safe_read(
             sandbox, task_id, "output/reports/junit.xml"
         )
+        # Enumerate screenshot files so we can wire them to per-test rows.
+        screenshot_paths = await _list_screenshots(sandbox, task_id)
 
     # 6. Decide outcome based on result.json + JUnit.
-    summary, per_test = _interpret_artifacts(result_json_text, junit_text)
+    summary, per_test = _interpret_artifacts(
+        result_json_text, junit_text, screenshot_paths
+    )
     outcome_status = _decide_status(terminal.status, summary)
     error_msg: str | None = None
     if outcome_status == TestExecutionStatus.ERRORED:
@@ -247,13 +252,20 @@ async def _poll_until_terminal(
 ) -> SandboxTaskState:
     """Wait until the sandbox task reaches a terminal state.
 
-    Emits a `test_execution_progress` event each time the status
-    actually changes (queued -> running -> succeeded/...). Tolerates
-    transient sandbox-svc errors up to `_MAX_CONSECUTIVE_POLL_ERRORS`.
+    Emits a `test_execution_progress` event each time the container
+    status changes (queued -> running -> ...).
+
+    While the container is `running`, also tails ``output/run_bundle.log``
+    and emits a ``test_execution_test_outcome`` event for every pytest
+    result line we see (``PASSED``, ``FAILED``, ``ERROR``, ``SKIPPED``).
+    This gives the UI live per-test feedback without waiting for the
+    final JUnit XML.
     """
-    interval = max(0.5, float(settings.sandbox_poll_interval_seconds))
+    interval = max(2.0, float(settings.sandbox_poll_interval_seconds))
     last_status: str | None = None
     consecutive_errors = 0
+    log_offset = 0  # byte offset into run_bundle.log, advanced as we read
+
     while True:
         try:
             current = await sandbox.get_task(task_id)
@@ -288,9 +300,101 @@ async def _poll_until_terminal(
                 )
             last_status = current.status
 
+        # While running, tail the log and emit per-test outcome events.
+        if current.status == "running":
+            new_text = await _tail_log(sandbox, task_id, log_offset)
+            if new_text:
+                log_offset += len(new_text.encode())
+                outcomes = _parse_pytest_live_output(new_text)
+                if outcomes:
+                    async with async_session_maker() as session:
+                        for outcome in outcomes:
+                            await agent_event_service.create(
+                                session,
+                                run_id,
+                                node_name=_NODE,
+                                event_type="test_execution_test_outcome",
+                                payload={
+                                    "execution_id": str(execution_id),
+                                    "test_id": outcome["test_id"],
+                                    "outcome": outcome["outcome"],
+                                },
+                            )
+
         if current.status in TERMINAL_STATUSES:
             return current
         await asyncio.sleep(interval)
+
+
+async def _tail_log(
+    sandbox: SandboxClient, task_id: str, offset: int
+) -> str | None:
+    """Read run_bundle.log from `offset` bytes onwards.
+
+    Returns the new text or None on any error. Never raises.
+    """
+    try:
+        full = await sandbox.read_artifact_text(
+            task_id, "output/run_bundle.log"
+        )
+        if full is None:
+            return None
+        encoded = full.encode()
+        if offset >= len(encoded):
+            return None
+        return encoded[offset:].decode(errors="replace")
+    except Exception:
+        return None
+
+
+# Pattern matches pytest verbose output lines like:
+#   tests/test_foo.py::test_bar PASSED                  [  4%]
+#   tests/test_foo.py::test_bar FAILED                  [  8%]
+#   tests/test_foo.py::test_bar ERROR
+#   tests/test_foo.py::test_bar SKIPPED (...)           [ 12%]
+_PYTEST_LINE_RE = re.compile(
+    r"^(tests/\S+::(?:\S+))\s+(PASSED|FAILED|ERROR|SKIPPED)",
+    re.MULTILINE,
+)
+
+_OUTCOME_MAP = {
+    "PASSED": TestOutcome.PASSED.value,
+    "FAILED": TestOutcome.FAILED.value,
+    "ERROR": TestOutcome.ERRORED.value,
+    "SKIPPED": TestOutcome.SKIPPED.value,
+}
+
+
+def _parse_pytest_live_output(text: str) -> list[dict[str, str]]:
+    """Extract per-test outcomes from a chunk of pytest -v output."""
+    results = []
+    for match in _PYTEST_LINE_RE.finditer(text):
+        test_id = match.group(1)
+        raw_outcome = match.group(2)
+        results.append(
+            {
+                "test_id": test_id,
+                "outcome": _OUTCOME_MAP.get(raw_outcome, TestOutcome.ERRORED.value),
+            }
+        )
+    return results
+
+
+async def _list_screenshots(
+    sandbox: SandboxClient, task_id: str
+) -> list[str]:
+    """Return paths like 'output/reports/screenshots/foo.png' for this task."""
+    try:
+        files = await sandbox.list_files(task_id)
+        return [
+            str(f.get("path", ""))
+            for f in files
+            if str(f.get("path", "")).startswith("output/reports/screenshots/")
+            and str(f.get("path", "")).endswith(".png")
+        ]
+    except Exception as exc:
+        logger.warning("could not list screenshots for task %s: %s", task_id, exc)
+        return []
 
 
 async def _safe_read(
@@ -307,21 +411,13 @@ async def _safe_read(
 
 
 def _interpret_artifacts(
-    result_json_text: str | None, junit_text: str | None
+    result_json_text: str | None,
+    junit_text: str | None,
+    screenshot_paths: list[str] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Turn the runner's outputs into a summary + per-test rows.
-
-    The runner's `result.json` is the most authoritative source for
-    suite-level counts because it can incorporate either summary.json
-    or junit.xml. The per-test detail (test_id, failure trace, etc)
-    only comes from junit.xml.
-    """
+    """Turn the runner's outputs into a summary + per-test rows."""
     summary: dict[str, Any] = {
-        "total": 0,
-        "passed": 0,
-        "failed": 0,
-        "skipped": 0,
-        "errored": 0,
+        "total": 0, "passed": 0, "failed": 0, "skipped": 0, "errored": 0,
     }
 
     if result_json_text:
@@ -338,12 +434,11 @@ def _interpret_artifacts(
     per_test: list[dict[str, Any]] = []
     if junit_text:
         try:
-            per_test = _parse_junit_per_test(junit_text)
+            per_test = _parse_junit_per_test(junit_text, screenshot_paths or [])
         except Exception as exc:
             logger.warning("junit parse failed: %s", exc)
 
-    # If the runner-summary was missing but we have junit, regen the
-    # counts from the per-test rows for resilience.
+    # Regen counts from per-test rows when the runner summary was absent.
     if summary["total"] == 0 and per_test:
         for r in per_test:
             summary["total"] += 1
@@ -360,8 +455,26 @@ def _interpret_artifacts(
     return summary, per_test
 
 
-def _parse_junit_per_test(xml_text: str) -> list[dict[str, Any]]:
-    """Walk the JUnit XML and extract a flat per-test row list."""
+def _nodeid_to_screenshot_key(nodeid: str) -> str:
+    """Mirror the conftest hook: re.sub(r'[^\\w.-]', '_', nodeid)."""
+    return re.sub(r"[^\w.-]", "_", nodeid)
+
+
+def _parse_junit_per_test(
+    xml_text: str, screenshot_paths: list[str]
+) -> list[dict[str, Any]]:
+    """Walk the JUnit XML and extract a flat per-test row list.
+
+    For failing/errored tests we look for a matching screenshot under
+    output/reports/screenshots/<safe_nodeid>.png using the same
+    sanitisation the conftest hook uses.
+    """
+    # Index screenshots by their stem (filename without .png) for O(1) lookup.
+    screenshot_index: dict[str, str] = {}
+    for p in screenshot_paths:
+        stem = p.rsplit("/", 1)[-1].removesuffix(".png")
+        screenshot_index[stem] = p
+
     root = ET.fromstring(xml_text)
     suites = (
         root.findall("testsuite") if root.tag == "testsuites" else [root]
@@ -378,7 +491,7 @@ def _parse_junit_per_test(xml_text: str) -> list[dict[str, Any]]:
                 try:
                     duration_ms = int(float(duration_attr) * 1000)
                 except ValueError:
-                    duration_ms = None
+                    pass
 
             failure = case.find("failure")
             error = case.find("error")
@@ -387,6 +500,7 @@ def _parse_junit_per_test(xml_text: str) -> list[dict[str, Any]]:
             outcome = TestOutcome.PASSED.value
             failure_message: str | None = None
             failure_trace: str | None = None
+            screenshot_path: str | None = None
 
             if failure is not None:
                 outcome = TestOutcome.FAILED.value
@@ -400,6 +514,11 @@ def _parse_junit_per_test(xml_text: str) -> list[dict[str, Any]]:
                 outcome = TestOutcome.SKIPPED.value
                 failure_message = skipped.get("message") or None
 
+            # Match screenshot for failed/errored tests.
+            if outcome in (TestOutcome.FAILED.value, TestOutcome.ERRORED.value):
+                key = _nodeid_to_screenshot_key(test_id)
+                screenshot_path = screenshot_index.get(key)
+
             rows.append(
                 {
                     "test_id": test_id,
@@ -407,10 +526,7 @@ def _parse_junit_per_test(xml_text: str) -> list[dict[str, Any]]:
                     "duration_ms": duration_ms,
                     "failure_message": failure_message,
                     "failure_trace": failure_trace,
-                    # We don't yet wire screenshots back to per-test rows.
-                    # The runner stores them under reports/screenshots/
-                    # without a 1:1 mapping; that's a follow-up.
-                    "screenshot_path": None,
+                    "screenshot_path": screenshot_path,
                 }
             )
     return rows

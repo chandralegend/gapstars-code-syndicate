@@ -16,8 +16,8 @@ from typing import Any
 BUNDLE_CONTRACT = """\
 <TASK_CONTRACT>
 You are running inside an isolated Linux sandbox. Your job is to
-produce a runnable, framework-agnostic test bundle that exercises the
-approved test cases provided below.
+produce a runnable test bundle that exercises the approved test cases
+provided below.
 
 ## Single-entrypoint contract — STRICT
 
@@ -26,37 +26,103 @@ Every bundle you produce MUST follow this layout under
 
   - ``run.sh``         POSIX shell. Runs the chosen test framework.
                        Top of file: ``set -euo pipefail``. Installs
-                       any missing dependencies inline. Writes a JUnit
-                       XML report to ``reports/junit.xml`` and a
-                       one-line summary to ``reports/summary.json``
-                       with shape::
+                       any missing dependencies inline (using pip3).
+                       Writes a JUnit XML report to
+                       ``reports/junit.xml`` and a JSON summary to
+                       ``reports/summary.json`` with this exact shape::
                          { "framework": "...", "total": N, "passed": N,
-                           "failed": N, "skipped": N, "duration_s": N,
-                           "exit_code": N }
-                       Exits with the framework's exit code.
+                           "failed": N, "skipped": N, "errored": N,
+                           "duration_s": N, "exit_code": N }
+                       Exits with 0 always (the harness reads the
+                       summary to decide pass/fail).
   - ``manifest.json``  Machine-readable description (schema below).
   - ``README.md``      Short human-readable description + how to run.
-  - ``tests/``         Framework-native test files.
+  - ``tests/``         Test files. See rules below.
   - ``reports/``       Directory with a single ``.gitkeep`` initially.
-                       run.sh populates this at run-time.
+                       run.sh populates it at run-time.
 
-The caller will only ever invoke ``bash run.sh``. Anything else
-(dependencies, fixtures, config) must be wired in by ``run.sh``. There
-is exactly ONE entrypoint — do not produce additional driver scripts.
+The caller will only ever invoke ``bash run.sh``. Exactly ONE entrypoint.
 
 ## Framework choice
 
-Pick ONE framework appropriate for the project's tech stack. Default
-matrix:
+Pick pytest with Playwright for any test that touches a browser UI.
+Use plain pytest (no browser) for pure API/logic tests.
+Default: pytest + playwright.
 
-  - Python / FastAPI / REST API     -> pytest (+ httpx / requests)
-  - Browser flows that click        -> Playwright (Python preferred,
-                                        Node also fine)
-  - Node / TypeScript unit tests    -> vitest
-  - Anything ambiguous              -> pytest
+The execution container already has these packages installed:
+  - pytest, pytest-html, pytest-playwright, playwright (chromium)
+Do NOT re-install them. You MAY install extra packages (e.g. requests).
 
-Use the simplest tooling that covers the cases. Prefer pytest unless
-the cases obviously need a real browser.
+## pytest rules — READ CAREFULLY
+
+### 1. No relative imports
+
+Every test file MUST use only absolute imports or top-level names.
+NEVER write ``from .conftest import ...`` or any other relative import.
+Python's test runner will fail with ImportError if you do this.
+
+WRONG:  from .conftest import my_helper
+RIGHT:  # define helpers as pytest fixtures in conftest.py instead
+
+### 2. No manual browser/page fixtures
+
+pytest-playwright provides ``page``, ``browser``, ``context`` fixtures
+automatically. Do NOT re-define ``browser``, ``context``, or ``page``
+in conftest.py. Just use ``def test_foo(page):`` directly.
+
+### 3. conftest.py — screenshot on failure
+
+ALWAYS create ``tests/conftest.py`` containing exactly this hook and
+nothing else (add project-specific fixtures below it):
+
+```python
+import pytest
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    rep = outcome.get_result()
+    if rep.when == "call" and rep.failed:
+        page = item.funcargs.get("page")
+        if page is not None:
+            import pathlib, re
+            safe = re.sub(r"[^\\w.-]", "_", item.nodeid)
+            path = pathlib.Path("reports/screenshots") / f"{safe}.png"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                page.screenshot(path=str(path))
+            except Exception:
+                pass
+```
+
+This hook captures a screenshot for every failing browser test and
+saves it as ``reports/screenshots/<nodeid>.png``. The runner will
+expose these screenshots in the results UI.
+
+### 4. No __init__.py files
+
+Do NOT create ``tests/__init__.py``. Pytest's rootdir discovery works
+better without it for flat test directories.
+
+### 5. run.sh pytest invocation
+
+Call pytest with these flags (copy verbatim, adjust paths only):
+
+```bash
+set +e
+python3 -m pytest tests/ \
+  --junitxml=reports/junit.xml \
+  --html=reports/report.html --self-contained-html \
+  -v \
+  --tb=short \
+  --maxfail=0 \
+  -p no:cacheprovider
+PYTEST_EXIT=$?
+set -e
+```
+
+Then generate ``reports/summary.json`` from the JUnit XML using a short
+inline Python script, then ``exit 0``.
 
 ## manifest.json schema
 
@@ -68,46 +134,38 @@ the cases obviously need a real browser.
     "test_count": <int>,
     "test_cases": [
       {
-        "id": "<input test-case UUID, copy verbatim>",
+        "id": "<input test-case UUID — copy verbatim>",
         "title": "<copied from input>",
         "test_path": "tests/foo.py::test_bar"
-      },
-      ...
+      }
     ],
-    "runtime": { "python": "3.11" }    // or { "node": "20" }, etc.
-    "env": { "required": [], "optional": [] }
+    "runtime": { "python": "3.11" }
   }
 
-``test_cases[].id`` MUST equal the input UUID so downstream tooling can
-map results back to the original case.
+``test_cases[].id`` MUST equal the input UUID exactly.
 
 ## Forbidden
 
-- Hand-fabricated fixtures that have no input case backing them.
-- Cases with ``status != "approved"``. Generate scripts only for
-  approved cases.
-- Tests that depend on internet access at run time, unless the input
-  case explicitly describes that.
-- Multiple entrypoints. Exactly one ``run.sh``.
-- Documentation-only output. Test code is required.
-
-## Speed
-
-Aim for under 5 minutes wall-clock. ~10 tool calls maximum. Do NOT
-take screenshots — there is no UI to observe. Write the bundle and
-stop.
+- Relative imports in any test file.
+- Re-defining ``browser``, ``context``, or ``page`` fixtures.
+- ``tests/__init__.py``.
+- Tests that depend on internet access unless the case explicitly
+  requires it.
+- Multiple entrypoints.
+- Documentation-only output — test code is required.
 
 ## Process
 
-1. Read the project context, feature expectation, and approved test
-   cases. Pick the framework.
-2. Create the directory layout described above. Use ``mkdir -p`` and
-   ``str_replace_based_edit_tool create`` for files.
-3. Author one test per approved case. Skip cases that cannot be
-   automated and document why in README.md.
-4. Write ``run.sh`` last so the test files are in place.
-5. Verify the layout with ``ls -la /task/output/workspace`` once.
-6. End your turn with a one-sentence plain-text summary.
+1. Read project context, feature expectation, and approved test cases.
+2. Create ``tests/conftest.py`` with the screenshot hook first.
+3. Author one test function per approved case. Each function name must
+   contain the short test-case title (snake_cased) so failures are
+   easy to identify.
+4. Write ``run.sh`` last — use the exact pytest invocation above.
+5. Write ``manifest.json`` and ``README.md``.
+6. Run ``ls -la /task/output/workspace/tests/`` to verify no
+   ``__init__.py`` crept in and all test files are present.
+7. End your turn with a one-sentence plain-text summary.
 
 Stay strictly within ``/task/output/workspace/``. Do not write
 outside it.
@@ -120,11 +178,7 @@ def build_agent_4_prompt(
     workspace_findings: str | None,
     approved_test_cases: list[dict[str, Any]],
 ) -> str:
-    """Compose the user prompt sent to the sandbox.
-
-    All four sections are JSON-encoded except the findings, which are
-    rendered verbatim (markdown).
-    """
+    """Compose the user prompt sent to the sandbox."""
     ctx = project_context or {}
     fe = feature_expectation or {}
     findings_block = workspace_findings or "(no findings.md was captured)"
@@ -134,7 +188,8 @@ You are generating a runnable test-script bundle for a QA team. Read the
 sections below, pick a single test framework, and produce the bundle
 under ``/task/output/workspace/`` per the strict system-prompt contract.
 
-Move quickly — aim to finish in under 5 minutes. No screenshots.
+Move quickly — aim to finish in under 5 minutes. No screenshots of your
+own work; the conftest hook handles test-failure screenshots.
 
 ## Project context
 - Name: {ctx.get("name", "N/A")}
@@ -150,10 +205,8 @@ Move quickly — aim to finish in under 5 minutes. No screenshots.
 {findings_block}
 
 ## Approved test cases
-The list below contains every approved test case for this run, in JSON.
-Each item carries an ``id`` (UUID) — copy it verbatim into the
-``test_cases[].id`` field of ``manifest.json`` so results can be mapped
-back. Generate one test per item.
+Each item carries an ``id`` (UUID) — copy it verbatim into
+``manifest.json`` ``test_cases[].id``. Generate one test per item.
 
 {json.dumps(approved_test_cases, indent=2)}
 

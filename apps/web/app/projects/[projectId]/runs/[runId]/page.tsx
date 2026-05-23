@@ -49,6 +49,7 @@ import {
   runStepperState,
 } from "@/lib/labels"
 import {
+  cancelTestExecution,
   createTestExecution,
   executionArtifactUrl,
   extendSandboxTimeout,
@@ -2105,9 +2106,19 @@ function TestResultsPanel({ runId }: { runId: string }) {
 
   const latest: TestExecutionDetail | null = detailQ.data ?? null
 
-  // Poll while the most recent execution is still in flight. Polling
-  // both list + detail so we pick up the new history entry on a manual
-  // re-run too.
+  const cancelMut = useMutation(
+    useCallback(
+      async () => {
+        const id = detailQ.data?.id
+        if (!id) throw new Error("no execution to cancel")
+        return cancelTestExecution(id)
+      },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [detailQ.data?.id],
+    ),
+  )
+
+  // Poll while the most recent execution is still in flight.
   const isLive =
     latest?.status === "queued" || latest?.status === "running"
   useEffect(() => {
@@ -2129,6 +2140,19 @@ function TestResultsPanel({ runId }: { runId: string }) {
     } catch (e) {
       toast.error(
         `Could not run tests: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
+  }
+
+  const handleCancel = async () => {
+    try {
+      await cancelMut.run()
+      toast.success("Execution cancelled.")
+      await listQ.mutate()
+      await detailQ.mutate()
+    } catch (e) {
+      toast.error(
+        `Could not cancel: ${e instanceof Error ? e.message : String(e)}`,
       )
     }
   }
@@ -2182,6 +2206,8 @@ function TestResultsPanel({ runId }: { runId: string }) {
         loadingDetail={detailQ.loading && !latest}
         onRunAgain={handleRunAgain}
         runAgainLoading={trigger.loading}
+        onCancel={handleCancel}
+        cancelLoading={cancelMut.loading}
       />
 
       {latest && latest.status === "errored" && latest.error && (
@@ -2212,11 +2238,15 @@ function ExecutionHero({
   loadingDetail,
   onRunAgain,
   runAgainLoading,
+  onCancel,
+  cancelLoading,
 }: {
   execution: TestExecutionDetail | null
   loadingDetail: boolean
   onRunAgain: () => void
   runAgainLoading: boolean
+  onCancel: () => void
+  cancelLoading: boolean
 }) {
   if (!execution) {
     return (
@@ -2272,7 +2302,17 @@ function ExecutionHero({
             </div>
           )}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {isLive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={cancelLoading}
+              onClick={onCancel}
+            >
+              {cancelLoading ? "Cancelling…" : "Cancel"}
+            </Button>
+          )}
           <Button
             variant="accent"
             size="sm"

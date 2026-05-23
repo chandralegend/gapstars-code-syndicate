@@ -536,7 +536,16 @@ export interface paths {
         get: operations["get_execution_api_executions__execution_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Cancel Execution
+         * @description Cancel a queued or running execution.
+         *
+         *     Sends a cancel request to sandbox-svc (best-effort; the task may have
+         *     already finished by the time we get there) and marks the execution as
+         *     ``errored`` immediately so the UI stops showing it as in-flight.
+         *     Returns 409 if the execution is already in a terminal state.
+         */
+        delete: operations["cancel_execution_api_executions__execution_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2306,6 +2315,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestExecutionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_execution_api_executions__execution_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestExecutionRead"];
                 };
             };
             /** @description Validation Error */
