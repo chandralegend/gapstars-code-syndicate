@@ -1,15 +1,64 @@
 "use client"
 
 import Link from "next/link"
-import { ChevronRightIcon, ExternalLinkIcon, SearchIcon } from "lucide-react"
+import {
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  SearchIcon,
+} from "lucide-react"
 
 import { Kbd } from "@/components/probe/kbd"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/shell/theme-toggle"
 import { useBreadcrumbsStore } from "@/lib/stores/breadcrumbs"
+import { isActiveRun, isReviewPause, runStatusLabel } from "@/lib/labels"
 import { cn } from "@/lib/utils"
+
+/**
+ * The badge in the top-right while the user is on a run page. Tone +
+ * pulse follow the run's status:
+ *   - active (*_running)        -> accent + pulsing dot, label "Live"
+ *   - review (*_review)         -> warn   + steady dot, label "Awaiting you"
+ *   - completed                 -> ok     + steady dot, label "Completed"
+ *   - failed                    -> err    + steady dot, label "Failed"
+ *   - else (pending / unknown)  -> muted, label "Queued"
+ */
+function RunBadge({ status }: { status?: string }) {
+  if (!status) return null
+  const active = isActiveRun(status)
+  const review = isReviewPause(status)
+  const variant: "accent" | "warn" | "ok" | "err" | "muted" = active
+    ? "accent"
+    : review
+      ? "warn"
+      : status === "completed"
+        ? "ok"
+        : status === "failed"
+          ? "err"
+          : "muted"
+  const label = active
+    ? "Live"
+    : review
+      ? "Awaiting you"
+      : runStatusLabel(status)
+  return (
+    <Badge variant={variant} className="gap-1.5">
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          variant === "accent" && "bg-accent-ink animate-pulse",
+          variant === "warn" && "bg-warn-ink",
+          variant === "ok" && "bg-ok-ink",
+          variant === "err" && "bg-err-ink",
+          variant === "muted" && "bg-ink-4",
+        )}
+      />
+      {label}
+    </Badge>
+  )
+}
 
 export function Topbar() {
   const items = useBreadcrumbsStore((s) => s.items)
@@ -51,10 +100,7 @@ export function Topbar() {
       <div className="ml-auto flex items-center gap-2.5">
         {rightSlot === "run" && (
           <>
-            <Badge variant="accent" className="gap-1.5">
-              <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
-              Live
-            </Badge>
+            <RunBadge status={runSlot.runStatus} />
             {runSlot.openTestHref && (
               <Link
                 href={runSlot.openTestHref}
@@ -67,13 +113,23 @@ export function Topbar() {
           </>
         )}
         {rightSlot === "default" && (
-          <>
-            <Button variant="ghost" size="sm">
-              <SearchIcon className="size-[13px]" />
-              Search
-            </Button>
+          <button
+            type="button"
+            onClick={() => {
+              // Synthesise the ⌘K keystroke. The CommandPalette listens for
+              // it as the canonical open trigger so we route through one
+              // path.
+              window.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+              )
+            }}
+            className="border-border bg-card hover:bg-muted text-ink-2 hover:text-foreground inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-[12.5px]"
+            aria-label="Open command palette"
+          >
+            <SearchIcon className="size-[13px]" />
+            <span>Search</span>
             <Kbd>⌘K</Kbd>
-          </>
+          </button>
         )}
         <ThemeToggle />
       </div>

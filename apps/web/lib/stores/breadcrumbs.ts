@@ -8,6 +8,8 @@ import type { BreadcrumbItem } from "@/lib/types"
 export interface RunSlotData {
   /** Where the topbar's "Open feature test" link should point. */
   openTestHref?: string
+  /** Latest run status, used by the topbar to tune the Live badge. */
+  runStatus?: string
 }
 
 interface BreadcrumbsState {

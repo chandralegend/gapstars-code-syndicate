@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/shell/app-sidebar"
+import { CommandPalette } from "@/components/shell/command-palette"
 import { Topbar } from "@/components/shell/topbar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
@@ -10,6 +11,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Topbar />
         <div className="min-h-0 flex-1 overflow-auto">{children}</div>
       </SidebarInset>
+      <CommandPalette />
     </SidebarProvider>
   )
 }
