@@ -21,7 +21,12 @@ export function StatusDot({
 }) {
   return (
     <span
-      className={cn("relative inline-block shrink-0 rounded-full", COLORS[kind], className)}
+      aria-hidden
+      className={cn(
+        "relative inline-block shrink-0 rounded-full",
+        COLORS[kind],
+        className,
+      )}
       style={{ width: size, height: size }}
     >
       {kind === "running" && (
