@@ -143,6 +143,11 @@ const EVENT_LABEL: Record<string, string> = {
   script_bundle_progress: "Test-script progress",
   script_bundle_succeeded: "Test scripts ready",
   script_bundle_failed: "Test-script generation failed",
+  test_execution_started: "Running tests",
+  test_execution_progress: "Test execution progress",
+  test_execution_succeeded: "All tests passed",
+  test_execution_failed: "Some tests failed",
+  test_execution_errored: "Could not run tests",
   error: "Error",
   done: "Stream closed",
 }
@@ -225,6 +230,35 @@ export function eventSummary(
     case "script_bundle_succeeded": {
       const tests = typeof p.test_count === "number" ? p.test_count : null
       return tests != null ? `${tests} tests scripted` : null
+    }
+    case "test_execution_started": {
+      const total = typeof p.total === "number" ? p.total : null
+      const trig =
+        p.trigger === "manual" ? "manual re-run" : "auto run after generation"
+      return total ? `${total} tests, ${trig}` : trig
+    }
+    case "test_execution_progress": {
+      const s = String(p.status ?? "")
+      if (s === "queued") return "Waiting for a runner"
+      if (s === "running") return "Tests in progress"
+      if (s === "succeeded") return "Tests finished"
+      if (s === "failed") return "Tests stopped"
+      return null
+    }
+    case "test_execution_succeeded":
+    case "test_execution_failed": {
+      const summary = (p.summary ?? {}) as Record<string, unknown>
+      const total = Number(summary.total ?? 0)
+      const failed = Number(summary.failed ?? 0) + Number(summary.errored ?? 0)
+      if (!total) return null
+      const passed = Number(summary.passed ?? 0)
+      return failed > 0
+        ? `${passed} passed, ${failed} failed of ${total}`
+        : `${passed} of ${total} passed`
+    }
+    case "test_execution_errored": {
+      const err = typeof p.error === "string" ? p.error : null
+      return err ? err.slice(0, 80) : null
     }
     default:
       return null

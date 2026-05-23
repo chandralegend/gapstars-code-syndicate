@@ -87,6 +87,13 @@ export type TestScriptBundle = Schemas["TestScriptBundleRead"]
 export type TestScriptBundleStatus = Schemas["TestScriptBundleStatus"]
 export type BundleFileList = Schemas["BundleFileList"]
 
+export type TestExecution = Schemas["TestExecutionRead"]
+export type TestExecutionDetail = Schemas["TestExecutionDetail"]
+export type TestExecutionResult = Schemas["TestExecutionResultRead"]
+export type TestExecutionStatus = Schemas["TestExecutionStatus"]
+export type TestExecutionTrigger = Schemas["TestExecutionTrigger"]
+export type TestOutcome = Schemas["TestOutcome"]
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**

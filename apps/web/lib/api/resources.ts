@@ -20,6 +20,8 @@ import {
   type SandboxScreenshotList,
   type SandboxStatus,
   type TestCase,
+  type TestExecution,
+  type TestExecutionDetail,
   type TestScenario,
   type TestScenarioCreate,
   type TestScenarioUpdate,
@@ -341,4 +343,69 @@ export async function readScriptBundleFile(
 
 export function scriptBundleDownloadUrl(runId: string): string {
   return `${API_URL}/api/runs/${runId}/scripts/latest/download`
+}
+
+// ── Test executions ─────────────────────────────────────────────────────────
+
+export async function listTestExecutions(
+  runId: string,
+): Promise<TestExecution[]> {
+  return unwrap(
+    await apiClient.GET("/api/runs/{run_id}/executions", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+export async function getLatestTestExecution(
+  runId: string,
+): Promise<TestExecution | null> {
+  const res = await apiClient.GET("/api/runs/{run_id}/executions/latest", {
+    params: { path: { run_id: runId } },
+  })
+  if (res.error) {
+    const status =
+      typeof res.error === "object" && res.error
+        ? (res.error as { status?: number }).status
+        : undefined
+    // Treat 404 as "no execution yet" so callers render an empty state.
+    if (status === 404) return null
+    throw res.error instanceof Error
+      ? res.error
+      : new Error(JSON.stringify(res.error))
+  }
+  return res.data ?? null
+}
+
+export async function getTestExecution(
+  executionId: string,
+): Promise<TestExecutionDetail> {
+  return unwrap(
+    await apiClient.GET("/api/executions/{execution_id}", {
+      params: { path: { execution_id: executionId } },
+    }),
+  )
+}
+
+export async function createTestExecution(
+  runId: string,
+): Promise<TestExecution> {
+  return unwrap(
+    await apiClient.POST("/api/runs/{run_id}/executions", {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
+/**
+ * Direct URL to a per-execution artifact (typically a screenshot under
+ * output/reports/screenshots/...). Bypasses the client envelope so it
+ * can be used in <img src> directly.
+ */
+export function executionArtifactUrl(
+  executionId: string,
+  path: string,
+): string {
+  const segments = path.split("/").map(encodeURIComponent).join("/")
+  return `${API_URL}/api/executions/${executionId}/artifacts/${segments}`
 }

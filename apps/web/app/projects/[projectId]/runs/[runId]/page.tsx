@@ -11,6 +11,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
+  PlayIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   SendIcon,
@@ -48,6 +49,8 @@ import {
   runStepperState,
 } from "@/lib/labels"
 import {
+  createTestExecution,
+  executionArtifactUrl,
   extendSandboxTimeout,
   generateTestScripts,
   getFeatureExpectation,
@@ -56,10 +59,12 @@ import {
   getRun,
   getSandboxStatus,
   getTestCases,
+  getTestExecution,
   getTestScenario,
   listSandboxFiles,
   listSandboxScreenshots,
   listScriptBundleFiles,
+  listTestExecutions,
   readSandboxFile,
   readScriptBundleFile,
   runEventsUrl,
@@ -74,6 +79,9 @@ import {
   type SandboxScreenshotList,
   type SandboxStatus,
   type TestCase,
+  type TestExecution,
+  type TestExecutionDetail,
+  type TestExecutionResult,
   type TestScriptBundle,
 } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
@@ -787,6 +795,9 @@ function RightPanel({
               {status === "completed" && (
                 <Tab value="scripts">Test scripts</Tab>
               )}
+              {status === "completed" && (
+                <Tab value="results">Test results</Tab>
+              )}
             </div>
           </TabsList>
 
@@ -834,6 +845,14 @@ function RightPanel({
             <TabsContent value="scripts" className="px-6 py-5">
               <div className={rail}>
                 <ScriptsPanel runId={runId} />
+              </div>
+            </TabsContent>
+          )}
+
+          {status === "completed" && (
+            <TabsContent value="results" className="px-6 py-5">
+              <div className={rail}>
+                <TestResultsPanel runId={runId} />
               </div>
             </TabsContent>
           )}
@@ -2058,5 +2077,465 @@ function FileViewer({ runId, path }: { runId: string; path: string }) {
     <pre className="max-h-[480px] overflow-auto p-4 font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
       {fileQ.data ?? ""}
     </pre>
+  )
+}
+
+// ── Test results (Agent 4 -> execution) ────────────────────────────────────
+
+function TestResultsPanel({ runId }: { runId: string }) {
+  // We fetch *list* + *latest* together. The list powers the history
+  // strip; latest is what the hero summary + per-test list show.
+  const listQ = useFetch(
+    useCallback(() => listTestExecutions(runId), [runId]),
+    [runId],
+  )
+  const latestId = listQ.data?.[0]?.id
+
+  const detailQ = useFetch(
+    useCallback(
+      async () => (latestId ? getTestExecution(latestId) : null),
+      [latestId],
+    ),
+    [latestId],
+  )
+
+  const trigger = useMutation(
+    useCallback(async () => createTestExecution(runId), [runId]),
+  )
+
+  const latest: TestExecutionDetail | null = detailQ.data ?? null
+
+  // Poll while the most recent execution is still in flight. Polling
+  // both list + detail so we pick up the new history entry on a manual
+  // re-run too.
+  const isLive =
+    latest?.status === "queued" || latest?.status === "running"
+  useEffect(() => {
+    if (!isLive) return
+    const t = setInterval(() => {
+      void listQ.mutate()
+      void detailQ.mutate()
+    }, 3_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, listQ.mutate, detailQ.mutate])
+
+  const handleRunAgain = async () => {
+    try {
+      await trigger.run()
+      toast.success("Queued a test execution.")
+      await listQ.mutate()
+      await detailQ.mutate()
+    } catch (e) {
+      toast.error(
+        `Could not run tests: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
+  }
+
+  if (listQ.error) {
+    return (
+      <div className="text-err-ink text-[12.5px]">{listQ.error.message}</div>
+    )
+  }
+
+  if (listQ.loading && !listQ.data) {
+    return <div className="text-ink-3 text-[13px]">Loading…</div>
+  }
+
+  // Empty: no executions yet (rare in practice because we auto-run,
+  // but possible if Agent 4 just finished and the worker hasn't
+  // queued the auto-execution yet, or the user disabled auto-run).
+  if (!listQ.data || listQ.data.length === 0) {
+    return (
+      <Section title="Test results">
+        <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
+          <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
+            <PlayIcon className="size-[20px]" />
+          </div>
+          <div className="mt-3 text-[16px] font-medium">
+            No test runs yet
+          </div>
+          <p className="text-ink-3 mt-1 max-w-[480px] text-center text-[13px]">
+            Run the generated test bundle to see results here. Each run
+            spins up its own sandbox container, captures pass/fail
+            counts, and stores screenshots for any failures.
+          </p>
+          <Button
+            variant="accent"
+            className="mt-5"
+            onClick={handleRunAgain}
+            disabled={trigger.loading}
+          >
+            <PlayIcon className="size-[13px]" />
+            {trigger.loading ? "Queuing…" : "Run tests"}
+          </Button>
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <ExecutionHero
+        execution={latest}
+        loadingDetail={detailQ.loading && !latest}
+        onRunAgain={handleRunAgain}
+        runAgainLoading={trigger.loading}
+      />
+
+      {latest && latest.status === "errored" && latest.error && (
+        <div className="border-err/40 bg-err-soft text-err-ink rounded-md border p-3 text-[12.5px]">
+          {latest.error}
+        </div>
+      )}
+
+      {latest && latest.results && latest.results.length > 0 && (
+        <ExecutionResultsList
+          executionId={latest.id}
+          results={latest.results}
+        />
+      )}
+
+      {listQ.data.length > 1 && (
+        <ExecutionHistoryStrip
+          executions={listQ.data}
+          activeId={latest?.id}
+        />
+      )}
+    </div>
+  )
+}
+
+function ExecutionHero({
+  execution,
+  loadingDetail,
+  onRunAgain,
+  runAgainLoading,
+}: {
+  execution: TestExecutionDetail | null
+  loadingDetail: boolean
+  onRunAgain: () => void
+  runAgainLoading: boolean
+}) {
+  if (!execution) {
+    return (
+      <div className="border-border bg-card rounded-lg border p-5">
+        <div className="text-ink-3 text-[13px]">
+          {loadingDetail ? "Loading the latest execution…" : "No detail yet."}
+        </div>
+      </div>
+    )
+  }
+
+  const summary = (execution.summary ?? {}) as Record<string, unknown>
+  const total = Number(summary.total ?? 0)
+  const passed = Number(summary.passed ?? 0)
+  const failed = Number(summary.failed ?? 0)
+  const skipped = Number(summary.skipped ?? 0)
+  const errored = Number(summary.errored ?? 0)
+  const isLive =
+    execution.status === "queued" || execution.status === "running"
+
+  return (
+    <div className="border-border bg-card rounded-lg border p-5">
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-ink-3 text-[11px] font-medium tracking-wide uppercase">
+            Latest execution
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <ExecutionVerdict status={execution.status} />
+            {execution.duration_ms != null && (
+              <span className="text-ink-4 font-mono text-[12px]">
+                {formatDuration(execution.duration_ms)}
+              </span>
+            )}
+            <span className="text-ink-4 text-[12px]">
+              <RelativeTime iso={execution.created_at} />
+            </span>
+            {execution.trigger === "auto" && (
+              <span className="text-ink-4 text-[11px]">auto</span>
+            )}
+          </div>
+          {total > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-4">
+              <CountTile label="Passed" value={passed} tone="ok" />
+              <CountTile label="Failed" value={failed} tone="err" />
+              <CountTile label="Skipped" value={skipped} tone="muted" />
+              <CountTile label="Errored" value={errored} tone="warn" />
+            </div>
+          )}
+          {isLive && total === 0 && (
+            <div className="text-ink-3 mt-3 text-[12.5px]">
+              Tests are still being prepared in the sandbox.
+            </div>
+          )}
+        </div>
+        <div className="ml-auto">
+          <Button
+            variant="accent"
+            size="sm"
+            disabled={runAgainLoading || isLive}
+            onClick={onRunAgain}
+          >
+            <PlayIcon className="size-[13px]" />
+            {runAgainLoading
+              ? "Queuing…"
+              : isLive
+                ? "Running…"
+                : "Run again"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ExecutionVerdict({ status }: { status: string }) {
+  const tone =
+    status === "passed"
+      ? "ok"
+      : status === "failed"
+        ? "err"
+        : status === "errored"
+          ? "warn"
+          : status === "running" || status === "queued"
+            ? "accent"
+            : "muted"
+  const label =
+    status === "passed"
+      ? "All tests passed"
+      : status === "failed"
+        ? "Some tests failed"
+        : status === "errored"
+          ? "Could not finish"
+          : status === "running"
+            ? "Running"
+            : status === "queued"
+              ? "Queued"
+              : status
+  return (
+    <Badge variant={tone === "muted" ? "muted" : tone} className="gap-1.5">
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          tone === "ok" && "bg-ok-ink",
+          tone === "err" && "bg-err-ink",
+          tone === "warn" && "bg-warn-ink",
+          tone === "accent" && "bg-accent-ink animate-pulse",
+          tone === "muted" && "bg-ink-4",
+        )}
+      />
+      {label}
+    </Badge>
+  )
+}
+
+function CountTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone: "ok" | "err" | "warn" | "muted"
+}) {
+  return (
+    <div>
+      <div
+        className={cn(
+          "text-[24px] leading-none font-semibold tracking-[-0.02em]",
+          tone === "ok" && value > 0 && "text-ok-ink",
+          tone === "err" && value > 0 && "text-err-ink",
+          tone === "warn" && value > 0 && "text-warn-ink",
+          (tone === "muted" || value === 0) && "text-ink-4",
+        )}
+      >
+        {value}
+      </div>
+      <div className="text-ink-3 mt-1 text-[11px] tracking-wide uppercase">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function ExecutionResultsList({
+  executionId,
+  results,
+}: {
+  executionId: string
+  results: TestExecutionResult[]
+}) {
+  // Group: failed first, then errored, then passed, then skipped. People
+  // overwhelmingly want to see what broke.
+  const ordered = useMemo(() => {
+    const order: Record<string, number> = {
+      failed: 0,
+      errored: 1,
+      passed: 2,
+      skipped: 3,
+    }
+    return [...results].sort(
+      (a, b) => (order[a.outcome] ?? 99) - (order[b.outcome] ?? 99),
+    )
+  }, [results])
+
+  return (
+    <Section title={`Per test (${results.length})`}>
+      <div className="border-border bg-card divide-border divide-y rounded-lg border">
+        {ordered.map((r) => (
+          <ResultRow key={r.id} result={r} executionId={executionId} />
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function ResultRow({
+  result,
+  executionId,
+}: {
+  result: TestExecutionResult
+  executionId: string
+}) {
+  const [open, setOpen] = useState(false)
+  const hasDetails =
+    !!result.failure_message ||
+    !!result.failure_trace ||
+    !!result.screenshot_path
+  const dot =
+    result.outcome === "passed"
+      ? "bg-ok-ink"
+      : result.outcome === "failed"
+        ? "bg-err-ink"
+        : result.outcome === "errored"
+          ? "bg-warn-ink"
+          : "bg-ink-4"
+
+  return (
+    <div className="px-4 py-3">
+      <button
+        type="button"
+        onClick={() => hasDetails && setOpen((o) => !o)}
+        className={cn(
+          "flex w-full items-center gap-3 text-left",
+          hasDetails && "cursor-pointer",
+        )}
+        disabled={!hasDetails}
+        aria-expanded={open}
+      >
+        <span
+          aria-hidden
+          className={cn("size-1.5 shrink-0 rounded-full", dot)}
+        />
+        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]">
+          {result.test_id}
+        </span>
+        {result.duration_ms != null && (
+          <span className="text-ink-4 shrink-0 font-mono text-[11px]">
+            {formatDuration(result.duration_ms)}
+          </span>
+        )}
+        <span
+          className={cn(
+            "shrink-0 rounded-[3px] px-1.5 py-px text-[10.5px] font-medium",
+            result.outcome === "passed" && "bg-ok-soft text-ok-ink",
+            result.outcome === "failed" && "bg-err-soft text-err-ink",
+            result.outcome === "errored" && "bg-warn-soft text-warn-ink",
+            result.outcome === "skipped" && "bg-muted text-ink-3",
+          )}
+        >
+          {result.outcome}
+        </span>
+        {hasDetails && (
+          <ChevronDownIcon
+            className={cn(
+              "text-ink-4 size-[13px] shrink-0 transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        )}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          {result.failure_message && (
+            <div className="text-err-ink text-[12.5px] font-medium">
+              {result.failure_message}
+            </div>
+          )}
+          {result.failure_trace && (
+            <pre className="border-border bg-muted text-ink-2 max-h-[280px] overflow-auto rounded-md border p-3 font-mono text-[11.5px] leading-snug whitespace-pre-wrap">
+              {result.failure_trace}
+            </pre>
+          )}
+          {result.screenshot_path && (
+            <a
+              href={executionArtifactUrl(executionId, result.screenshot_path)}
+              target="_blank"
+              rel="noreferrer"
+              className="block"
+            >
+              <img
+                src={executionArtifactUrl(
+                  executionId,
+                  result.screenshot_path,
+                )}
+                alt="Failure screenshot"
+                className="border-border max-h-[360px] w-full max-w-[600px] rounded-md border object-contain"
+              />
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ExecutionHistoryStrip({
+  executions,
+  activeId,
+}: {
+  executions: TestExecution[]
+  activeId: string | undefined
+}) {
+  // Show up to 8 most recent. Oldest on the left so the strip reads
+  // left-to-right like a sparkline of bundle health over time.
+  const recent = executions.slice(0, 8).slice().reverse()
+  return (
+    <Section title="Recent runs">
+      <div className="flex flex-wrap items-center gap-2">
+        {recent.map((e) => {
+          const tone =
+            e.status === "passed"
+              ? "bg-ok-ink"
+              : e.status === "failed"
+                ? "bg-err-ink"
+                : e.status === "errored"
+                  ? "bg-warn-ink"
+                  : "bg-ink-4"
+          const isActive = e.id === activeId
+          return (
+            <div
+              key={e.id}
+              title={`${e.status} · ${formatAbsolute(e.created_at)}`}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]",
+                isActive
+                  ? "border-foreground bg-card"
+                  : "border-border bg-card text-ink-3",
+              )}
+            >
+              <span
+                aria-hidden
+                className={cn("size-1.5 rounded-full", tone)}
+              />
+              <span className="font-mono">#{e.id.slice(0, 6)}</span>
+            </div>
+          )
+        })}
+      </div>
+    </Section>
   )
 }
