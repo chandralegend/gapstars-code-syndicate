@@ -42,6 +42,7 @@ import {
   runPhaseTitle,
   runStatusDot,
   runStatusTone,
+  runStepperState,
 } from "@/lib/labels"
 import {
   extendSandboxTimeout,
@@ -179,11 +180,12 @@ export default function ProjectRunDetailPage({
         ]
       : [{ label: "Projects", href: "/projects" }],
     "run",
-    scenario
-      ? {
-          openTestHref: `/projects/${projectId}/testsets/${scenario.id}`,
-        }
-      : undefined,
+    {
+      openTestHref: scenario
+        ? `/projects/${projectId}/testsets/${scenario.id}`
+        : undefined,
+      runStatus: run?.status,
+    },
   )
 
   // ── SSE ──────────────────────────────────────────────────────────────────
@@ -333,15 +335,12 @@ export default function ProjectRunDetailPage({
   }
 
   return (
-    <div className="grid h-full grid-cols-[440px_minmax(0,1fr)] overflow-hidden">
-      <aside className="border-border min-w-0 overflow-auto border-r">
+    <div className="grid h-full grid-cols-1 overflow-hidden lg:grid-cols-[360px_minmax(0,1fr)]">
+      <aside className="border-border min-w-0 overflow-auto border-b lg:border-r lg:border-b-0">
         <Timeline
           run={run}
           runError={runError}
           events={events}
-          onRefresh={async () => {
-            await refreshRun().catch(() => undefined)
-          }}
           runId={runId}
         />
       </aside>
@@ -359,6 +358,48 @@ export default function ProjectRunDetailPage({
         />
       </section>
     </div>
+  )
+}
+
+/* ────────────────────────────  Phase stepper  ──────────────────────── */
+
+function PhaseStepper({ status }: { status: string }) {
+  const steps = useMemo(() => runStepperState(status), [status])
+  return (
+    <ol
+      className="flex items-center gap-1.5"
+      aria-label="Run phases"
+    >
+      {steps.map((s, i) => {
+        const dotClass =
+          s.state === "done"
+            ? "bg-ok"
+            : s.state === "active"
+              ? "bg-accent"
+              : "bg-ink-4/40"
+        const labelClass =
+          s.state === "active"
+            ? "text-foreground font-medium"
+            : s.state === "done"
+              ? "text-ink-3"
+              : "text-ink-4"
+        return (
+          <li key={s.key} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={cn("h-1.5 w-1.5 rounded-full", dotClass)}
+            />
+            <span className={cn("text-[11.5px]", labelClass)}>{s.label}</span>
+            {i < steps.length - 1 && (
+              <span aria-hidden className="bg-ink-4/30 h-px w-3" />
+            )}
+            {s.state === "active" && (
+              <span className="sr-only">(current)</span>
+            )}
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 
@@ -455,13 +496,11 @@ function Timeline({
   run,
   runError,
   events,
-  onRefresh,
   runId,
 }: {
   run: Run | undefined
   runError: Error | undefined
   events: SseEvent[]
-  onRefresh: () => void | Promise<void>
   runId: string
 }) {
   const status = run?.status ?? "pending"
@@ -498,19 +537,13 @@ function Timeline({
         )}
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
-        <CapLine>orchestration steps</CapLine>
-        <Button variant="ghost" size="sm" onClick={() => void onRefresh()}>
-          <RefreshCwIcon className="size-[12px]" />
-          Refresh
-        </Button>
-      </div>
+      <CapLine className="mb-3">orchestration steps</CapLine>
 
       <div className="space-y-2">
         {buckets.length === 0 ? (
           <div className="text-ink-3 px-1 text-[12.5px]">
             The orchestration just started. The first event will arrive in a
-            few seconds…
+            few seconds.
           </div>
         ) : (
           buckets.map((b) => (
@@ -652,21 +685,44 @@ function RightPanel({
   const showReviewBar = status === "agent1_review" || status === "agent3_review"
   const reviewKind: "brief" | "cases" =
     status === "agent3_review" ? "cases" : "brief"
+  const sandboxRunning = status === "agent2_running"
+
+  // Default tab follows the run's phase, so the user always lands on
+  // the most useful surface for the current state of the world.
+  const defaultTab =
+    status === "agent2_running"
+      ? "sandbox"
+      : status === "agent3_review" || status === "completed"
+        ? "cases"
+        : "brief"
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-border flex items-center gap-3 border-b px-6 py-3.5">
-        <div>
-          <div className="text-[15px] font-semibold">{runPhaseTitle(status)}</div>
-          <div className="text-ink-3 text-[12px]">
-            {run?.current_node ? nodeLabel(run.current_node) : "Run details"}
+      <div className="border-border border-b px-6 py-3.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold">{runPhaseTitle(status)}</div>
+            <div className="text-ink-3 text-[12px]">
+              {run?.current_node
+                ? nodeLabel(run.current_node)
+                : "Waiting to start"}
+            </div>
+          </div>
+          <div className="ml-auto">
+            <PhaseStepper status={status} />
           </div>
         </div>
       </div>
 
+      {sandboxRunning && (
+        <div className="border-border border-b bg-muted/30 px-6 py-4">
+          <LiveScreenView runId={runId} runStatus={status} />
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-auto">
         <Tabs
-          defaultValue={status === "agent3_review" ? "cases" : "brief"}
+          defaultValue={defaultTab}
           className="flex min-h-0 flex-1 flex-col"
         >
           <TabsList className="border-border h-auto justify-start gap-1 rounded-none border-b bg-transparent px-6 py-0">
@@ -680,7 +736,9 @@ function RightPanel({
               )}
             </Tab>
             {sandboxStarted && (
-              <Tab value="sandbox">Sandbox activity</Tab>
+              <Tab value="sandbox">
+                {sandboxRunning ? "Sandbox details" : "Sandbox activity"}
+              </Tab>
             )}
             {status === "completed" && (
               <Tab value="scripts">Test scripts</Tab>
@@ -713,7 +771,11 @@ function RightPanel({
 
           {sandboxStarted && (
             <TabsContent value="sandbox" className="px-6 py-5">
-              <SandboxPanel runId={runId} runStatus={status} />
+              <SandboxPanel
+                runId={runId}
+                runStatus={status}
+                hideLiveView={sandboxRunning}
+              />
             </TabsContent>
           )}
 
@@ -737,11 +799,11 @@ function RightPanel({
             onChange={(e) => onFeedbackTextChange(e.target.value)}
             className="min-h-[60px] resize-none text-[13px]"
           />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-ink-4 text-[11px]">
-              Approve to continue · Request changes will loop the agent back
+              Approve to continue. Request changes loops the agent back.
             </span>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex flex-wrap gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1068,9 +1130,11 @@ const TRACE_KIND_LABEL: Record<string, string> = {
 function SandboxPanel({
   runId,
   runStatus,
+  hideLiveView = false,
 }: {
   runId: string
   runStatus: string
+  hideLiveView?: boolean
 }) {
   const filesQ = useFetch(
     useCallback(() => listSandboxFiles(runId), [runId]),
@@ -1125,7 +1189,9 @@ function SandboxPanel({
         {list.files.length} file{list.files.length === 1 ? "" : "s"}
       </div>
 
-      <LiveScreenView runId={runId} runStatus={runStatus} />
+      {!hideLiveView && (
+        <LiveScreenView runId={runId} runStatus={runStatus} />
+      )}
 
       {findings && <FindingsBlock runId={runId} path={findings.path} />}
       {events && <EventsBlock runId={runId} path={events.path} />}
