@@ -127,10 +127,7 @@ export default function NewTestsetPage({
         </Button>
       </div>
 
-      <h1
-        className="font-serif text-[34px] leading-tight tracking-[-0.015em]"
-        style={{ fontFamily: "var(--font-serif), serif" }}
-      >
+      <h1 className="font-serif text-[34px] leading-tight tracking-[-0.015em]">
         New feature test
       </h1>
       <p className="text-ink-3 mt-1 mb-5 text-[13.5px]">

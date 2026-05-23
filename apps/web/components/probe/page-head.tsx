@@ -19,10 +19,7 @@ export function PageHead({
       )}
     >
       <div>
-        <h1
-          className="font-serif text-[34px] leading-[1.1] tracking-[-0.015em]"
-          style={{ fontFamily: "var(--font-serif), serif" }}
-        >
+        <h1 className="font-serif text-[34px] leading-[1.1] tracking-[-0.015em]">
           {title}
         </h1>
         {sub && <div className="text-ink-3 mt-1 text-[13px]">{sub}</div>}

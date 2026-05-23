@@ -118,10 +118,7 @@ export default function OnboardPage() {
       </div>
 
       <div className="border-border bg-card rounded-lg border p-6">
-        <h2
-          className="font-serif text-[26px] leading-tight tracking-[-0.012em]"
-          style={{ fontFamily: "var(--font-serif), serif" }}
-        >
+        <h2 className="font-serif text-[26px] leading-tight tracking-[-0.012em]">
           {step === 0 && "Tell us about the project"}
           {step === 1 && "What problem does it solve?"}
           {step === 2 && "Who uses it and how is it built?"}

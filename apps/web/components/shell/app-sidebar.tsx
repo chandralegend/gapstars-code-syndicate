@@ -150,10 +150,7 @@ export function AppSidebar() {
       <SidebarHeader className="gap-3 px-3 pt-3.5">
         <div className="flex items-center gap-2.5 px-1">
           <ProbeMark />
-          <div
-            className="font-serif text-[22px] leading-none tracking-[-0.01em] text-[oklch(0.97_0.005_80)] group-data-[state=collapsed]:hidden"
-            style={{ fontFamily: "var(--font-serif), serif" }}
-          >
+          <div className="font-serif text-[22px] leading-none tracking-[-0.01em] text-[oklch(0.97_0.005_80)] group-data-[state=collapsed]:hidden">
             Pr<em className="text-accent not-italic italic">o</em>be
           </div>
         </div>
