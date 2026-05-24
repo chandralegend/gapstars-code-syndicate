@@ -1,14 +1,17 @@
 # claude-sandbox-svc
 
-Local FastAPI service that spins up Anthropic Computer Use Docker sandboxes on demand. Each task runs Claude headlessly inside the sandbox with optional file uploads and env vars, and exposes a live noVNC view through a signed-URL reverse proxy.
+Local FastAPI service that spins up isolated Docker sandboxes on demand. Each task runs in its own ephemeral container in one of two modes — **exploration** (Claude Computer Use driving a real browser) or **execution** (running a pre-built test bundle and capturing its reports). The exploration mode exposes a live noVNC view through a signed-URL reverse proxy.
 
 ## Architecture
 
 ```
 client ──HTTP──► FastAPI service ──docker.sock──► sandbox container
-                  │                                ├─ Xvfb + noVNC + Firefox + …
-                  │                                └─ headless agent runner
-                  │                                   (computer_use_demo.loop.sampling_loop)
+                  │                                ├─ Xvfb + noVNC + Firefox + Chromium
+                  │                                ├─ kind=exploration:
+                  │                                │    headless agent runner
+                  │                                │    (computer_use_demo.loop.sampling_loop)
+                  │                                └─ kind=execution:
+                  │                                     run_bundle.sh -> bash bundle/run.sh
                   │
                   ├─ SQLite (task metadata)
                   ├─ data/tasks/{id}/  (input, output, screenshots, logs)
@@ -16,17 +19,20 @@ client ──HTTP──► FastAPI service ──docker.sock──► sandbox co
 ```
 
 - One container per task. Container starts in `STARTING`, transitions to `RUNNING` once Docker reports it up, and ends in one of `SUCCEEDED`, `FAILED`, `TIMEOUT`, `CANCELLED`.
-- The agent loop runs *inside* the container using Anthropic's reference `computer_use_demo.loop.sampling_loop`. We bind-mount `data/tasks/{id}/` to `/task` in the container; the runner reads `/task/input.json` and writes `/task/output/...`.
+- Tasks come in two kinds:
+  - **`exploration`** (default) — Anthropic's `computer_use_demo.loop.sampling_loop` drives Chrome inside the container. Used by QALoop's Agents 2 and 4 for browsing and bundle generation.
+  - **`execution`** — the source task's `output/workspace/` is copied to the new container's `/task/input/bundle/`, then `bash run.sh` executes there. Used by QALoop's test-execution worker.
+- The runner reads `/task/input.json` (exploration) or `/task/input/bundle/run.sh` (execution) and writes `/task/output/...`.
 - Concurrency is bounded by `MAX_CONCURRENT_TASKS`; overflow stays `QUEUED` in SQLite.
 - Live view goes through the API service: `/tasks/{id}/viewer?token=…` (HMAC-bound to the task id), which iframes `/tasks/{id}/vnc/vnc.html?token=…` and `/tasks/{id}/vnc/websockify`.
 
-See [`PLAN.md`](./PLAN.md) for the design doc.
+See [`PLAN.md`](./PLAN.md) for the original design doc.
 
 ## Prerequisites
 
 - Docker (daemon running)
 - Python 3.11+
-- An Anthropic API key
+- An Anthropic API key (only needed for exploration tasks)
 
 ## Setup
 
@@ -63,7 +69,9 @@ Spec fields:
 
 | field | type | default | notes |
 |---|---|---|---|
-| `prompt` | string | required | What you want the agent to do. |
+| `prompt` | string | required | What you want the agent to do (ignored for `kind=execution`). |
+| `kind` | enum | `exploration` | `exploration` runs the Claude Computer Use loop. `execution` runs a bundle copied from `source_task_id`. |
+| `source_task_id` | string? | `null` | Required when `kind=execution`. The task whose `output/workspace/` holds the bundle to run. |
 | `model` | string | `DEFAULT_MODEL` | Any computer-use-capable Claude model. |
 | `system_prompt_suffix` | string | `""` | Appended to the upstream desktop system prompt. |
 | `max_iterations` | int | 50 | Soft cap (the upstream loop has no native iteration limit; container timeout is the hard cap). |
@@ -81,6 +89,7 @@ Returns `201` with a `TaskResponse`:
 {
   "id": "0a7c…",
   "status": "queued",
+  "kind": "exploration",
   "prompt": "Open https://example.com",
   "model": "claude-sonnet-4-5-20250929",
   "vnc_url": null,
@@ -90,7 +99,8 @@ Returns `201` with a `TaskResponse`:
   "finished_at": null,
   "exit_code": null,
   "error": null,
-  "result": null
+  "result": null,
+  "timeout_seconds": 1800
 }
 ```
 
@@ -108,13 +118,31 @@ List recent tasks (newest first).
 
 Request cancellation. Returns `202`. The runner stops the container and the task moves to `cancelled`.
 
+### `PATCH /tasks/{id}`
+
+Extend a running task's wall-clock budget. Body:
+
+```json
+{ "extra_seconds": 180 }
+```
+
+The runner re-reads `timeout_seconds` from SQLite every couple of seconds, so the new budget takes effect on the next tick. Returns `409` if the task is already in a terminal status.
+
 ### `GET /tasks/{id}/events`
 
 Server-Sent-Events stream of the agent's trace records (`run_start`, `assistant_text`, `tool_use`, `tool_result`, `run_end`, …). Closes once the task reaches a terminal state.
 
 ### `GET /tasks/{id}/artifacts/{name}`
 
-Download a file under the task directory: `output/result.json`, `output/error.json`, `output/trace.jsonl`, `screenshots/0001.png`, `logs/container.log`, etc. Path traversal is blocked.
+Download a file under the task directory: `output/result.json`, `output/error.json`, `output/trace.jsonl`, `output/reports/junit.xml`, `output/reports/screenshots/foo.png`, `logs/container.log`, etc. Path traversal is blocked.
+
+### `GET /tasks/{id}/files`
+
+List every file under the task directory (relative paths + size). Used by callers that want to enumerate before fetching.
+
+### `GET /tasks/{id}/zip`
+
+Stream a zip of `output/workspace/`. Used by orchestrators that want to download the agent's full workspace in one call.
 
 ### `GET /tasks/{id}/viewer?token=…`
 
@@ -122,18 +150,50 @@ Signed-URL HTML page that iframes the live noVNC client. The URL is returned as 
 
 > **Note:** The noVNC server inside the sandbox typically takes ~15 seconds to boot. The `vnc_url` is returned as soon as Docker reports the container `running`, which can be earlier than that. If the iframe fails to load on first paint, refresh after a few seconds.
 
+## Execution mode (`kind=execution`)
+
+Used for running a pre-built test bundle. The flow:
+
+1. Caller submits `POST /tasks` with `kind=execution` and `source_task_id`
+   pointing at a task whose `output/workspace/` contains a runnable bundle
+   (entrypoint `run.sh`, `manifest.json`, `tests/`, `reports/`).
+2. The service copies that workspace into the new task's
+   `data/tasks/{new_id}/input/bundle/`.
+3. The runner sets `TASK_KIND=execution` on the container env. The
+   image's `entrypoint.sh` dispatches to `/opt/runner/run_bundle.sh`
+   instead of the Claude agent loop.
+4. `run_bundle.sh` runs `bash /task/input/bundle/run.sh </dev/null`,
+   captures `reports/junit.xml` + `reports/summary.json` +
+   `reports/screenshots/`, copies them to `/task/output/reports/`, and
+   writes a parsed summary to `/task/output/result.json`.
+5. The harness exits 0 even when tests fail. Suite-level outcome lives
+   in `result.json`; the caller decides pass/fail from `summary.failed`.
+
+The runner image (`qa-sandbox:local`) ships with pytest, pytest-html,
+pytest-playwright, and chromium pre-installed so bundles don't pay the
+download cost on every execution.
+
 ## Examples
 
 ```bash
-# Simple task with a 5-minute cap
+# Simple exploration task with a 5-minute cap
 curl -X POST http://127.0.0.1:8000/tasks \
   -F 'data={"prompt":"Open https://example.com and describe what you see","timeout_seconds":300};type=application/json'
-# => {"id":"0a7c…","status":"queued",...}
+# => {"id":"0a7c…","status":"queued","kind":"exploration",...}
+
+# Execution task — run the bundle from a previous exploration task
+curl -X POST http://127.0.0.1:8000/tasks \
+  -F 'data={"prompt":"Execute the bundle","kind":"execution","source_task_id":"0a7c…","timeout_seconds":600};type=application/json'
 
 # With a file upload + env var
 curl -X POST http://127.0.0.1:8000/tasks \
   -F 'data={"prompt":"Read /task/input/files/spec.pdf and run the test plan against $TASK_TARGET_URL","env":{"TASK_TARGET_URL":"https://staging.example.com"},"timeout_seconds":1200};type=application/json' \
   -F 'files=@spec.pdf'
+
+# Extend a running task by 3 minutes
+curl -X PATCH http://127.0.0.1:8000/tasks/0a7c… \
+  -H 'content-type: application/json' \
+  -d '{"extra_seconds":180}'
 
 # Poll for completion
 curl http://127.0.0.1:8000/tasks/0a7c…
@@ -143,6 +203,8 @@ curl -N http://127.0.0.1:8000/tasks/0a7c…/events
 ```
 
 ## Per-task layout on disk
+
+Exploration task:
 
 ```
 data/tasks/{task_id}/
@@ -154,9 +216,31 @@ data/tasks/{task_id}/
 │   ├── error.json            # on failure
 │   ├── trace.jsonl           # one record per assistant block + tool result
 │   ├── screenshots/0001.png  # every screenshot the agent took
-│   └── …
+│   └── workspace/            # files the agent wrote (manifest.json, tests/, …)
 └── logs/
     └── container.log         # captured container stdout/stderr (secrets redacted)
+```
+
+Execution task:
+
+```
+data/tasks/{task_id}/
+├── input/
+│   └── bundle/               # copy of source task's output/workspace/
+│       ├── run.sh
+│       ├── manifest.json
+│       ├── tests/
+│       └── reports/          # populated at runtime by run.sh
+├── output/
+│   ├── result.json           # parsed { summary, exit_code, duration_ms }
+│   ├── reports/              # copy of bundle/reports after run.sh exits
+│   │   ├── junit.xml
+│   │   ├── report.html
+│   │   ├── summary.json
+│   │   └── screenshots/
+│   └── run_bundle.log        # captured stdout/stderr of run.sh
+└── logs/
+    └── container.log
 ```
 
 ## Configuration reference
@@ -187,14 +271,6 @@ data/tasks/{task_id}/
 ```
 
 The full suite runs without Docker (the docker layer is mocked in the API tests). End-to-end tests against a real sandbox container are out of scope for the unit suite; spin one up manually with `scripts/build_image.sh` then `scripts/dev_run.sh`.
-
-## Status
-
-- M1 — Sandbox image + headless runner ✅
-- M2 — FastAPI service + SQLite + container spawn ✅
-- M3 — noVNC reverse proxy with signed URLs ✅
-- M4 — Retention sweeper + env whitelist + log redaction ✅
-- M5 — SSE trace stream + README ✅
 
 ## License
 

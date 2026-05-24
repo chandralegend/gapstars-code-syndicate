@@ -1,214 +1,318 @@
-# Customer Support Multi-Agent Platform
+# QALoop
 
-A multi-agent customer support system built with LangGraph's **supervisor pattern**. Three specialized agents collaborate to handle customer inquiries -- a Triage agent classifies intent and delegates to Order Support and Technical Support specialists.
+> Agentic QA pipeline. Describe a feature in plain English, watch four agents draft a brief, explore the live product, generate test cases, ship a runnable pytest bundle, then execute it and surface pass/fail in one place.
+
+QALoop turns a one-line feature description into reproducible browser tests with a human-in-the-loop review at every stage.
+
+## What it does
+
+Each run walks one feature through five phases:
+
+1. **Brief** — Agent 1 reads project context and writes a structured feature expectation: what it does, how users interact, edge cases, acceptance criteria. You review and approve before anything else runs.
+2. **Sandbox exploration** — Agent 2 opens a real Chromium inside an isolated container, drives the product like a person would, and writes a markdown findings report plus screenshots.
+3. **Test cases** — Agent 3 reads the brief and the findings, then proposes ≤24 test cases split across happy paths, edge cases, and corner cases. You review, edit, and approve.
+4. **Test scripts** — Agent 4 generates a runnable pytest bundle from the approved cases (`run.sh` entrypoint, `tests/`, `manifest.json`, screenshot-on-failure conftest hook).
+5. **Test execution** — The bundle is auto-executed in a fresh sandbox container. JUnit XML is parsed back into per-test rows with failure traces and screenshots. You can re-run any time.
 
 ## Architecture
 
 ```
-User Message
-     |
-     v
-┌─────────────┐
-│   Triage    │  Classifies intent, handles FAQs,
-│  (Supervisor)│  delegates to specialists
-└──────┬──────┘
-       |
-  ┌────┴─────┐
-  v          v
-┌──────┐  ┌──────┐
-│Order │  │ Tech │
-│Support│  │Support│
-└──────┘  └──────┘
+                    ┌─────────────────────────────────────┐
+                    │            apps/web                  │
+                    │     Next.js + shadcn + SSE           │
+                    └────────────────┬─────────────────────┘
+                                     │ HTTP + SSE
+                                     ▼
+              ┌──────────────────────────────────────────┐
+              │              apps/api                     │
+              │   FastAPI + LangGraph orchestrator        │
+              │                                           │
+              │   ┌──────────┐  ┌──────────┐ ┌──────────┐ │
+              │   │ Agent 1  │  │ Agent 3  │ │ Agent 4  │ │
+              │   │ (LLM)    │  │ (LLM)    │ │ (sandbox)│ │
+              │   └──────────┘  └──────────┘ └──────────┘ │
+              │   ┌──────────┐  ┌──────────────────────┐  │
+              │   │ Agent 2  │  │ test-execution worker│  │
+              │   │ (sandbox)│  │ (auto-triggered)     │  │
+              │   └──────────┘  └──────────────────────┘  │
+              └────────────────┬─────────────────────────┘
+                       │ HTTP                │ HTTP
+                       ▼                     ▼
+        ┌──────────────────────┐  ┌─────────────────────┐
+        │   Postgres            │  │ claude-sandbox-svc  │
+        │   - runs, briefs      │  │ - spawns containers │
+        │   - test cases        │  │ - kind=exploration  │
+        │   - bundles           │  │ - kind=execution    │
+        │   - executions        │  │ - live noVNC view   │
+        └──────────────────────┘  └─────────────────────┘
+                                            │
+                                            ▼
+                                  ┌────────────────────┐
+                                  │ qa-sandbox:local    │
+                                  │ Docker image        │
+                                  │ - Chromium          │
+                                  │ - pytest+playwright │
+                                  │ - X11 + noVNC       │
+                                  └────────────────────┘
 ```
 
-- **Triage Agent** -- Front-line supervisor. Handles greetings, FAQs (return policy, shipping, warranty, etc.), and routes complex queries to the right specialist.
-- **Order Support Agent** -- Handles order lookups, shipping status, returns/refunds, and order modifications.
-- **Technical Support Agent** -- Handles product troubleshooting, account issues, password resets, and support ticket creation.
+### How the agents talk
 
-### Supervisor Pattern
-
-The Triage agent always stays in control. When it needs to delegate, it calls `route_to_agent` which triggers a handoff node that cleans up the routing message before passing control to the specialist. Each specialist has its own ReAct tool loop and returns a final response.
-
-### Graph Structure
+LangGraph drives the workflow as a state machine with explicit human-review interrupts. Every state transition emits an `agent_event` row and an SSE message; the UI subscribes to the run's SSE stream and renders a live timeline.
 
 ```
-START -> triage -> [triage_tools | handoff_to_order | handoff_to_tech | END]
-                    triage_tools -> triage
-                    handoff_to_order -> order_support -> [order_tools | END]
-                    handoff_to_tech -> technical_support -> [tech_tools | END]
+START
+ └─ load_project_context
+     └─ agent_1_generate (Brief draft)
+         └─ human_review_1     ◄── you approve / request changes
+             └─ agent_2_placeholder (Sandbox exploration)
+                 └─ agent_3_generate (Test case generation)
+                     └─ human_review_3   ◄── you approve / request changes
+                         └─ persist_results
+                             ├─ marks run completed
+                             └─ auto-triggers Agent 4 (script bundle)
+                                 └─ on bundle success → auto-execution
+END
 ```
+
+Agent 4 and the test-execution worker live outside the main graph because they're side-channels: a single completed run can have many bundles, and a single bundle can be re-executed any number of times.
 
 ## Stack
 
-| Layer | Technology |
+| Layer | Tech |
 |---|---|
-| Agent framework | LangGraph (supervisor pattern) |
-| Backend | FastAPI + Python 3.12 |
-| Package manager | uv |
-| CLI | Typer |
-| Frontend | Next.js 16 + shadcn/ui |
-| JS runtime | Bun |
-| Database | PostgreSQL 16 (LangGraph checkpointer) |
+| Orchestrator | LangGraph + FastAPI + Python 3.12 |
+| LLMs | Anthropic Claude Sonnet 4.5 (Agents 1/3 LLM, Agents 2/4 driving Computer Use) |
+| Frontend | Next.js 16 + shadcn/ui + Tailwind |
+| Database | Postgres 16 (LangGraph checkpointer + app data) |
 | Cache | Redis 7 |
-| Containers | Docker Compose |
+| Sandbox runner | Anthropic Computer Use base image + pytest + playwright + chromium |
+| Containers | Docker + Docker Compose |
+| Package mgmt | uv (Python), bun (Node) |
 
-## Project Structure
+## Quick start
+
+### 1. Configure
+
+```bash
+cp .env.example .env
+# Set ANTHROPIC_API_KEY in .env. The same key is used by Agents 1/3 (LLM)
+# and forwarded to spawned sandbox containers used by Agents 2/4.
+```
+
+### 2. Build the runner image (one-time)
+
+The `qa-sandbox:local` image is built outside compose because it embeds a
+~500MB Chromium. Build it once:
+
+```bash
+docker build -t qa-sandbox:local apps/claude-sandbox-svc/docker
+```
+
+### 3. Bring up the stack
+
+```bash
+make up
+# or: docker compose up --build -d
+```
+
+| Service | URL |
+|---|---|
+| Web UI | http://localhost:3000 |
+| API | http://localhost:8001 |
+| API docs | http://localhost:8001/docs |
+| Sandbox service | http://localhost:8100 |
+| Postgres | localhost:5432 |
+| Redis | localhost:6380 |
+
+### 4. Open the UI, create a project, start a run
 
 ```
-customer-support-multi-agent-platform/
+1. Visit http://localhost:3000
+2. Click "New project" — give it a name, description, and tech stack hint
+3. Inside the project, click "New feature test" — a one-liner like
+   "Converting EUR to LKR" is enough
+4. Click the play button on the feature test row to start a run
+5. Watch the timeline. Approve the brief when prompted, approve the
+   test cases when prompted. The bundle generates and runs itself.
+```
+
+### 5. Local development (without Docker)
+
+```bash
+# Terminal 1: infra
+make infra
+
+# Terminal 2: API
+make dev-api
+
+# Terminal 3: Web
+make dev-web
+```
+
+API runs on `:8001`, web on `:3001`, sharing the dockerized postgres + redis.
+
+## Project structure
+
+```
+qaloop/
 ├── apps/
-│   ├── api/                        # FastAPI + LangGraph backend
+│   ├── api/                            # FastAPI + LangGraph orchestrator
+│   │   ├── migrations/                 # alembic migrations (incl. test_executions)
 │   │   └── src/api/
-│   │       ├── agent/
-│   │       │   ├── agents/         # Agent prompts (triage, order, tech)
-│   │       │   ├── data/           # Mock databases (orders, products, accounts)
-│   │       │   ├── tools/          # Agent tools (triage, order, technical)
-│   │       │   ├── graph.py        # Supervisor multi-agent graph
-│   │       │   ├── state.py        # AgentState with current_agent tracking
-│   │       │   └── checkpointer.py # Postgres persistence
+│   │       ├── qa_workflow/            # LangGraph state machine
+│   │       │   ├── graph.py            # nodes + edges
+│   │       │   ├── state.py
+│   │       │   └── nodes/
+│   │       │       ├── agent_1.py      # Brief drafting (LLM)
+│   │       │       ├── agent_2.py      # Sandbox exploration (claude-sandbox-svc)
+│   │       │       ├── agent_3.py      # Test case generation (LLM)
+│   │       │       └── persist.py      # marks completed + auto-triggers Agent 4
+│   │       ├── script_generation/      # Agent 4 (bundle generation)
+│   │       │   ├── prompt.py           # bundle contract sent to Claude
+│   │       │   └── worker.py           # runs the sandbox task and parses output
+│   │       ├── test_execution/         # bundle execution worker
+│   │       │   └── worker.py           # spawns kind=execution sandbox, parses JUnit
+│   │       ├── sandbox/                # client for claude-sandbox-svc HTTP API
 │   │       ├── routers/
-│   │       │   └── agent.py        # /api/chat endpoints with agent SSE events
-│   │       ├── config.py
-│   │       └── main.py
-│   └── web/                        # Next.js + shadcn/ui frontend
-│       ├── components/chat/
-│       │   ├── agent-badge.tsx     # Per-agent colored badges
-│       │   ├── chat-interface.tsx
-│       │   ├── message-input.tsx
-│       │   └── message-list.tsx
-│       ├── hooks/use-chat.ts       # Chat hook with agent tracking
-│       └── lib/
-│           ├── api.ts              # SSE client with agent event handling
-│           └── types.ts            # AgentName type + display config
-├── packages/                       # Shared packages (future use)
+│   │       │   ├── runs.py             # run lifecycle + SSE stream
+│   │       │   ├── test_scripts.py     # bundle lifecycle
+│   │       │   ├── test_executions.py  # execution lifecycle (incl. cancel)
+│   │       │   └── ...
+│   │       ├── services/               # one module per resource (CRUD + queries)
+│   │       └── db/models/              # SQLModel models
+│   │
+│   ├── web/                            # Next.js frontend
+│   │   ├── app/projects/[projectId]/
+│   │   │   └── runs/[runId]/page.tsx   # run-detail (timeline + results)
+│   │   ├── components/
+│   │   │   ├── shell/                  # sidebar, topbar, command palette
+│   │   │   └── probe/                  # shared probes (status badge, page-head)
+│   │   └── lib/api/                    # typed client generated from OpenAPI
+│   │
+│   └── claude-sandbox-svc/             # Sandbox spawner service
+│       ├── app/                        # FastAPI service
+│       └── docker/                     # qa-sandbox:local image source
+│           ├── Dockerfile
+│           ├── entrypoint.sh           # dispatches on TASK_KIND
+│           ├── headless.py             # exploration mode (Computer Use)
+│           └── run_bundle.sh           # execution mode (run pytest)
+│
 ├── docker-compose.yml
+├── Makefile
 └── .env.example
 ```
 
-## Agent Tools
+## Agent details
 
-### Triage Agent
+### Agent 1 — Brief
 
-| Tool | Description |
+| | |
 |---|---|
-| `lookup_faq` | Look up FAQs by topic (return policy, shipping, warranty, payments, etc.) |
-| `route_to_agent` | Route conversation to a specialist agent |
+| Driver | Anthropic Claude (LLM-only, no sandbox) |
+| Caps | ≤10 acceptance criteria, ≤8 edge cases |
+| Output | Feature expectation row, version-bumped on each revision |
+| Review gate | `agent1_review` — user approves or requests changes |
 
-### Order Support Agent
+### Agent 2 — Sandbox exploration
 
-| Tool | Description |
+| | |
 |---|---|
-| `lookup_order` | Retrieve full order details by order ID |
-| `check_shipping_status` | Get shipping/tracking info for an order |
-| `initiate_return` | Start a return for an eligible order |
-| `modify_order` | Submit a modification request for a processing order |
+| Driver | Claude Computer Use inside qa-sandbox container (kind=exploration) |
+| Time budget | 6 minutes default, extendable from the UI |
+| Output | `findings.md`, screenshots, full trace.jsonl |
+| Soft success | If the sandbox times out but `findings.md` exists, treat as success |
 
-### Technical Support Agent
+### Agent 3 — Test cases
 
-| Tool | Description |
+| | |
 |---|---|
-| `search_knowledge_base` | Find troubleshooting guides for product issues |
-| `check_account_status` | Look up customer account details |
-| `reset_password` | Send a password reset link |
-| `create_support_ticket` | Escalate issues to human engineers |
+| Driver | Anthropic Claude (LLM-only) |
+| Output | Up to 24 test cases per run, split across happy / edge / corner |
+| Review gate | `agent3_review` — user approves the set |
 
-## Mock Data
+### Agent 4 — Script bundle
 
-The system includes realistic mock data for demonstration:
+| | |
+|---|---|
+| Driver | Claude Computer Use inside qa-sandbox container (kind=exploration) |
+| Output | `tests/conftest.py` (with screenshot-on-failure hook), `run.sh`, `manifest.json`, ≤8 tests per file |
+| Auto-trigger | Fires automatically when `persist_results` runs |
+| Manual trigger | `POST /api/runs/:id/scripts` |
 
-- **5 orders** -- Various statuses (delivered, in transit, processing, cancelled)
-- **5 products** -- With detailed troubleshooting guides (headphones, smart home hub, keyboard, speaker, webcam)
-- **4 customer accounts** -- With different subscription tiers and account statuses
+### Test execution (no LLM)
 
-## Quick Start
+| | |
+|---|---|
+| Driver | qa-sandbox container in kind=execution mode |
+| Source | Bundle workspace from Agent 4's task is copied into the new container's `input/bundle/` |
+| Entrypoint | `bash /opt/runner/run_bundle.sh` runs `bash run.sh`, captures `reports/junit.xml`, `reports/summary.json`, `reports/screenshots/` |
+| Persistence | `test_executions` row + per-test `test_execution_results` rows (full failure trace, screenshot path) |
+| Auto-trigger | Fires when Agent 4 emits `script_bundle_succeeded` |
+| Manual re-run | `POST /api/runs/:id/executions` |
+| Cancel | `DELETE /api/executions/:id` |
 
-### 1. Clone and configure environment
+## API surface
+
+Documented at `/docs` (generated from FastAPI OpenAPI). Key endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/projects` | Create a project |
+| POST | `/api/projects/:id/test-scenarios` | Create a feature test |
+| POST | `/api/test-scenarios/:id/runs` | Start a run |
+| GET | `/api/runs/:id` | Run detail |
+| GET | `/api/runs/:id/events` | SSE stream of timeline events |
+| GET | `/api/runs/:id/feature-expectation` | The current brief |
+| POST | `/api/runs/:id/feedback` | Approve or request changes at a review gate |
+| GET | `/api/runs/:id/test-cases` | The test cases |
+| GET | `/api/runs/:id/scripts/latest` | The current bundle |
+| POST | `/api/runs/:id/scripts` | Manually trigger Agent 4 |
+| GET | `/api/runs/:id/executions` | Execution history |
+| POST | `/api/runs/:id/executions` | Trigger a manual execution |
+| GET | `/api/executions/:id` | Execution detail with per-test rows |
+| DELETE | `/api/executions/:id` | Cancel a queued or running execution |
+| GET | `/api/executions/:id/artifacts/output/...` | Screenshots, JUnit XML, run-bundle log |
+
+## Make targets
 
 ```bash
-git clone https://github.com/Gapstars-Pvt-Ltd/customer-support-multi-agent-platform.git
-cd customer-support-multi-agent-platform
-cp .env.example .env
-# Edit .env and set your OPENAI_API_KEY
+make help             # list every target
+make install          # uv sync + bun install for all workspaces
+make up               # docker compose up --build -d
+make down             # docker compose down
+make dev              # api + web in parallel without docker
+make logs             # tail every container
+make lint             # ruff + eslint
+make typecheck        # tsc on the web workspace
+make test             # pytest on the api workspace
 ```
 
-### 2. Run with Docker Compose
+## Environment variables
 
-```bash
-docker compose up --build
-```
+See `.env.example`. The minimum to run:
 
-- Web UI: http://localhost:3000
-- API: http://localhost:8000
-- API docs: http://localhost:8000/docs
+| Var | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | LLM driver for Agents 1/3 and forwarded to sandbox containers |
+| `LLM_PROVIDER` | `anthropic` (the default; `openai` and `mistral` are also wired) |
+| `TOKEN_SECRET` | HMAC secret used by claude-sandbox-svc to sign noVNC URLs |
+| `POSTGRES_*` | Database credentials |
 
-### 3. Local development (without Docker)
+Tuning knobs:
 
-**Backend:**
-
-```bash
-cd apps/api
-uv sync
-uv run api dev
-```
-
-**Frontend:**
-
-```bash
-cd apps/web
-bun install
-bun dev
-```
-
-> Make sure Postgres and Redis are running locally (or use `docker compose up postgres redis`).
-
-## API Endpoints
-
-| Method | Path | Description |
+| Var | Default | What it changes |
 |---|---|---|
-| GET | `/api/health` | Health check |
-| POST | `/api/chat` | Send message, get full response with agent name |
-| POST | `/api/chat/stream` | Send message, stream response via SSE |
+| `SANDBOX_DEFAULT_TIMEOUT_SECONDS` | 360 | Agent 2 wall-clock budget (seconds) |
+| `SANDBOX_MAX_ITERATIONS` | 12 | Agent 2 tool-call cap |
+| `MAX_CONCURRENT_TASKS` | 2 | sandbox-svc concurrent containers |
 
-### SSE Event Types
+## Sub-package docs
 
-The `/api/chat/stream` endpoint emits the following Server-Sent Events:
+- [`apps/api/`](apps/api/) — FastAPI + LangGraph orchestrator
+- [`apps/web/`](apps/web/README.md) — Next.js frontend
+- [`apps/claude-sandbox-svc/`](apps/claude-sandbox-svc/README.md) — Sandbox spawner service
 
-| Event | Data | Description |
-|---|---|---|
-| `agent` | `{"agent": "triage"}` | Active agent changed |
-| `token` | `{"token": "Hello"}` | Partial text token from the model |
-| `done` | `{"thread_id": "..."}` | Stream complete |
-| `error` | `{"detail": "..."}` | Error occurred |
+## License
 
-## Example Interactions
-
-| User Message | Routing | Agent |
-|---|---|---|
-| "Hello, what can you help with?" | Direct response | Triage |
-| "What's your return policy?" | FAQ lookup | Triage |
-| "Where is my order ORD-1002?" | Delegates | Order Support |
-| "I want to return order ORD-1001" | Delegates | Order Support |
-| "My headphones won't turn on" | Delegates | Technical Support |
-| "I forgot my password" | Delegates | Technical Support |
-
-## Frontend Features
-
-- **Agent badges** on each message showing which agent responded (color-coded)
-- **Header badge** showing the currently active agent
-- **Real-time streaming** with per-token updates via SSE
-- **Agent switch indicators** during streaming
-- **Dark/light theme** toggle (press `D`)
-- **Persistent threads** -- conversations survive page reloads
-
-## Environment Variables
-
-See `.env.example` for all variables. Key settings:
-
-| Variable | Description | Default |
-|---|---|---|
-| `OPENAI_API_KEY` | OpenAI API key (required) | -- |
-| `OPENAI_MODEL` | Model to use | `gpt-4o-mini` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/multiagent` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
-| `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` |
-| `NEXT_PUBLIC_API_URL` | API URL for the frontend | `http://localhost:8000` |
+MIT.
