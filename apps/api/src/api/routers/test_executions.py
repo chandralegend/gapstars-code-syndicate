@@ -230,7 +230,7 @@ async def get_execution_artifact(
 
     async with SandboxClient(settings.sandbox_base_url) as sandbox:
         try:
-            blob = await sandbox.read_artifact_bytes(
+            result = await sandbox.read_artifact_bytes(
                 execution.sandbox_task_id, path
             )
         except SandboxError as exc:
@@ -238,7 +238,15 @@ async def get_execution_artifact(
                 status_code=404, detail=f"Artifact not available: {exc}"
             ) from exc
 
+    if result is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    blob, sandbox_content_type = result
+    # Prefer our extension-based mime guess (more accurate for png/jpg);
+    # fall back to whatever sandbox-svc reported.
     media_type = _guess_media_type(path)
+    if media_type == "application/octet-stream":
+        media_type = sandbox_content_type
     return Response(content=blob, media_type=media_type)
 
 
