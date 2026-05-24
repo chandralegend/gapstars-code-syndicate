@@ -5,7 +5,7 @@
       "type": "local",
       "command": ["npx", "-y", "@21st-dev/magic@latest", "mcp"],
       "enabled": true,
-      "env": {
+      "environment": {
         "API_KEY": "{env:MAGIC_MCP_API_KEY}"
       }
     }
