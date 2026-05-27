@@ -315,4 +315,11 @@ Tuning knobs:
 
 ## License
 
-MIT.
+[PolyForm Noncommercial 1.0.0](./LICENSE).
+
+QALoop is free for any noncommercial purpose — personal projects, research,
+study, hobby work, or use by educational, charitable, public safety, public
+health, or government organizations. Commercial use requires a separate
+license; open an issue if that's you.
+
+Copyright © 2026 Chandra Legend.

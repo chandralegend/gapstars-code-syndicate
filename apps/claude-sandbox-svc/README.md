@@ -274,4 +274,4 @@ The full suite runs without Docker (the docker layer is mocked in the API tests)
 
 ## License
 
-MIT.
+PolyForm Noncommercial 1.0.0. See [`LICENSE`](../../LICENSE) at the repo root.
