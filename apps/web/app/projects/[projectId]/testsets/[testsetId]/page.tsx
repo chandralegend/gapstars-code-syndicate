@@ -133,7 +133,7 @@ export default function TestsetDetailPage({
             <Tab value="brief">Brief</Tab>
             <Tab value="runs">
               Runs
-              <span className="bg-muted text-ink-3 ml-1.5 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+              <span className="bg-muted text-ink-3 ml-1.5 rounded-sm px-1.5 py-px font-mono text-[10px]">
                 {runs.length}
               </span>
             </Tab>

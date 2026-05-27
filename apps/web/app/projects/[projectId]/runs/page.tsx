@@ -2,7 +2,7 @@
 
 import { use, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRightIcon } from "lucide-react"
+import { ActivityIcon, ChevronRightIcon } from "lucide-react"
 
 import { CapLine } from "@/components/probe/cap-line"
 import { PageHead } from "@/components/probe/page-head"
@@ -60,7 +60,18 @@ export default function ProjectRunsPage({
     )
   }
   if (!project) {
-    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+    return (
+      <div role="status" aria-label="Loading runs" className="px-6 py-10 space-y-2">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="border-border flex items-center gap-4 rounded-lg border px-4 py-3">
+            <div className="bg-muted h-4 w-20 animate-pulse rounded motion-reduce:animate-none" />
+            <div className="bg-muted h-4 flex-1 animate-pulse rounded motion-reduce:animate-none" />
+            <div className="bg-muted h-5 w-16 animate-pulse rounded motion-reduce:animate-none" />
+          </div>
+        ))}
+        <span className="sr-only">Loading runs…</span>
+      </div>
+    )
   }
 
   const active = runs.filter(
@@ -88,10 +99,21 @@ export default function ProjectRunsPage({
         </div>
 
         {runs.length === 0 ? (
-          <div className="border-border bg-card rounded-lg border border-dashed py-12 text-center">
-            <div className="text-ink-3 text-[13px]">
-              No runs yet. Open a feature test to kick one off.
+          <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+            <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
+              <ActivityIcon aria-hidden className="size-5" />
             </div>
+            <div className="mt-3 text-base font-medium">No runs yet</div>
+            <p className="text-ink-3 mt-1 max-w-[380px] text-sm">
+              A run takes a feature test through all five phases — brief, sandbox, test cases, scripts, and execution.
+            </p>
+            <Button
+              variant="accent"
+              className="mt-5"
+              onClick={() => router.push(`/projects/${projectId}/testsets`)}
+            >
+              Open a feature test
+            </Button>
           </div>
         ) : (
           <div className="border-border bg-card overflow-hidden rounded-lg border">

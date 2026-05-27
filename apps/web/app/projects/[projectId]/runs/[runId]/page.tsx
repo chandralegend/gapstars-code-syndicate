@@ -555,7 +555,7 @@ function Timeline({
         </Row>
         <Row label="Phase">
           <span className="font-medium">{runPhaseTitle(status)}</span>
-          <span className="text-ink-4 ml-auto font-mono text-[11px]">
+          <span className="text-ink-3 ml-auto font-mono text-[11px]">
             {Math.min(phaseIndex + 1, PHASE_ORDER.length)} of {PHASE_ORDER.length}
           </span>
         </Row>
@@ -618,8 +618,10 @@ function NodeCard({
   const eventCount = visibleEvents.length
   return (
     <div
+      role="status"
+      aria-label={`${nodeLabel(bucket.node_name)}: ${status.label}`}
       className={cn(
-        "rounded-md border px-3 py-2.5",
+        "rounded-lg border px-3 py-3",
         status.tone === "err" && "border-err/40 bg-err-soft/30",
         status.tone === "warn" && "border-warn/40 bg-warn-soft/30",
         status.tone === "accent" && "border-accent/40 bg-accent-soft/30",
@@ -629,7 +631,7 @@ function NodeCard({
     >
       <div className="flex items-center gap-2">
         <StatusDot kind={status.dot} size={6} />
-        <div className="text-[13px] font-medium">
+        <div className="text-sm font-medium">
           {nodeLabel(bucket.node_name)}
         </div>
         <Badge
@@ -639,32 +641,37 @@ function NodeCard({
           {status.label}
         </Badge>
       </div>
-      <div className="text-ink-4 mt-1 flex items-center gap-2 text-[11px]">
+      <div className="text-ink-3 mt-1 flex items-center gap-2 text-xs">
         <span>{nodePhase(bucket.node_name)}</span>
         {bucket.startedAt && (
           <>
-            <span>·</span>
+            <span aria-hidden>·</span>
             <RelativeTime iso={bucket.startedAt} />
           </>
         )}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="text-ink-3 hover:text-foreground ml-auto inline-flex items-center gap-0.5 text-[11px]"
+          aria-expanded={open}
+          aria-controls={`node-events-${bucket.node_name}`}
+          className="text-ink-3 hover:text-foreground ml-auto inline-flex cursor-pointer items-center gap-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
         >
           {open ? (
-            <ChevronDownIcon className="size-[11px]" />
+            <ChevronDownIcon aria-hidden className="size-[11px]" />
           ) : (
-            <ChevronRightIcon className="size-[11px]" />
+            <ChevronRightIcon aria-hidden className="size-[11px]" />
           )}
           {eventCount} event{eventCount === 1 ? "" : "s"}
         </button>
       </div>
 
       {open && (
-        <div className="border-border divide-border -mx-3 mt-2 divide-y border-t">
+        <div
+          id={`node-events-${bucket.node_name}`}
+          className="border-border divide-border -mx-3 mt-2 divide-y border-t"
+        >
           {visibleEvents.length === 0 ? (
-            <div className="text-ink-4 px-3 py-2 text-[11.5px]">
+            <div className="text-ink-3 px-3 py-2 text-xs">
               No events to show beyond the summary above.
             </div>
           ) : (
@@ -695,17 +702,17 @@ function EventLine({ e }: { e: SseEvent }) {
         {summary && (
           <span className="text-ink-3 truncate">{summary}</span>
         )}
-        <span className="text-ink-4 ml-auto shrink-0 font-mono text-[10.5px]">
+        <span className="text-ink-3 ml-auto shrink-0 font-mono text-[10.5px]">
           <RelativeTime iso={e.created_at} />
         </span>
       </div>
       {hasPayload && (
         <details className="group/det mt-1">
-          <summary className="text-ink-4 hover:text-ink-3 cursor-pointer list-none text-[10.5px] select-none">
+          <summary className="text-ink-3 hover:text-ink-3 cursor-pointer list-none text-[10.5px] select-none">
             <span className="group-open/det:hidden">Show details</span>
             <span className="hidden group-open/det:inline">Hide details</span>
           </summary>
-          <pre className="text-ink-3 bg-muted/50 mt-1 max-h-[200px] overflow-auto rounded-[4px] p-2 font-mono text-[10.5px] whitespace-pre-wrap">
+          <pre className="text-ink-3 bg-muted/50 mt-1 max-h-[200px] overflow-auto rounded-sm p-2 font-mono text-[10.5px] whitespace-pre-wrap">
             {JSON.stringify(e.payload, null, 2)}
           </pre>
         </details>
@@ -836,7 +843,7 @@ function RightPanel({
               <Tab value="cases">
                 Test cases
                 {cases.length > 0 && (
-                  <span className="bg-muted text-ink-3 ml-1.5 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+                  <span className="bg-muted text-ink-3 ml-1.5 rounded-sm px-1.5 py-px font-mono text-[10px]">
                     {cases.length}
                   </span>
                 )}
@@ -922,7 +929,7 @@ function RightPanel({
               className="min-h-[60px] resize-none text-[13px]"
             />
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-ink-4 text-[11px]">
+              <span className="text-ink-3 text-[11px]">
                 Approve to continue. Request changes loops the agent back.
               </span>
               <div className="ml-auto flex flex-wrap gap-2">
@@ -1035,7 +1042,7 @@ function FeaturePanel({ fe }: { fe: FeatureExpectation }) {
                 key={i}
                 className="border-border bg-card flex items-start gap-3 rounded-md border p-3"
               >
-                <span className="bg-foreground text-background mt-0.5 shrink-0 rounded-[4px] px-1.5 py-0.5 font-mono text-[10.5px] font-semibold">
+                <span className="bg-foreground text-background mt-0.5 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10.5px] font-semibold">
                   AC{i + 1}
                 </span>
                 <span className="text-[13px]">{String(t)}</span>
@@ -1101,7 +1108,7 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                   className="border-border bg-card rounded-md border p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="bg-muted text-ink-3 rounded-[3px] px-1.5 py-px font-mono text-[10.5px]">
+                    <span className="bg-muted text-ink-3 rounded-sm px-1.5 py-px font-mono text-[10.5px]">
                       {tc.id.slice(0, 8)}
                     </span>
                     <span className="text-[13.5px] font-medium">{tc.title}</span>
@@ -1122,7 +1129,7 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                     {tc.description}
                   </p>
                   {tc.preconditions && (
-                    <div className="text-ink-4 mt-1 text-[12px]">
+                    <div className="text-ink-3 mt-1 text-[12px]">
                       Before you start: {tc.preconditions}
                     </div>
                   )}
@@ -1147,7 +1154,7 @@ function CasesPanel({ cases }: { cases: TestCase[] }) {
                     Expected: {tc.expected_result}
                   </div>
                   {tc.rationale && (
-                    <div className="text-ink-4 mt-1 text-[12px]">
+                    <div className="text-ink-3 mt-1 text-[12px]">
                       Why it matters: {tc.rationale}
                     </div>
                   )}
@@ -1335,7 +1342,7 @@ function SandboxPanel({
                 >
                   {f.path}
                 </a>
-                <span className="text-ink-4 ml-auto font-mono text-[11px]">
+                <span className="text-ink-3 ml-auto font-mono text-[11px]">
                   {f.size} B
                 </span>
                 <ExternalLinkIcon className="text-ink-4 size-[11px]" />
@@ -1398,11 +1405,11 @@ function EventsBlock({
           <ul className="divide-border divide-y">
             {lines.map((l, i) => (
               <li key={i} className="flex gap-3 px-3 py-2 text-[12.5px]">
-                <span className="text-ink-4 w-[68px] shrink-0 font-mono text-[11px]">
+                <span className="text-ink-3 w-[68px] shrink-0 font-mono text-[11px]">
                   {l.ts ? formatAbsolute(l.ts).split(", ")[1] ?? "" : ""}
                 </span>
                 {l.kind && (
-                  <span className="bg-muted text-ink-3 h-fit rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+                  <span className="bg-muted text-ink-3 h-fit rounded-sm px-1.5 py-px font-mono text-[10px]">
                     {l.kind}
                   </span>
                 )}
@@ -1466,10 +1473,10 @@ function TraceBlock({
                 {lines.map((l, i) => (
                   <li key={i} className="px-3 py-2 text-[12.5px]">
                     <div className="flex items-center gap-2">
-                      <span className="text-ink-4 font-mono text-[10.5px]">
+                      <span className="text-ink-3 font-mono text-[10.5px]">
                         {l.ts ? formatAbsolute(l.ts).split(", ")[1] ?? "" : ""}
                       </span>
-                      <span className="bg-muted text-ink-3 rounded-[3px] px-1.5 py-px font-mono text-[10px]">
+                      <span className="bg-muted text-ink-3 rounded-sm px-1.5 py-px font-mono text-[10px]">
                         {l.kind ? TRACE_KIND_LABEL[l.kind] ?? l.kind : "raw"}
                       </span>
                       {l.name && (
@@ -1633,7 +1640,7 @@ function LiveScreenView({
                 replay
               </Badge>
             )}
-            <span className="text-ink-4 ml-auto font-mono text-[11px]">
+            <span className="text-ink-3 ml-auto font-mono text-[11px]">
               {displayedIdx + 1} / {screenshots.length}
             </span>
             {screenshots.length > 1 && !playing && (
@@ -1815,7 +1822,7 @@ function DeadlineBar({ runId }: { runId: string }) {
               : "Sandbox deadline reached"}
           </span>
           {total > 0 && (
-            <span className="text-ink-4 font-mono text-[11px]">
+            <span className="text-ink-3 font-mono text-[11px]">
               {formatRemainingShort(total - remaining)} / {formatRemainingShort(total)}
             </span>
           )}
@@ -2162,7 +2169,7 @@ function BundleFiles({ runId }: { runId: string }) {
               >
                 <FileTextIcon className="text-ink-4 size-[12px] shrink-0" />
                 <span className="truncate">{display}</span>
-                <span className="text-ink-4 ml-auto font-mono text-[10px]">
+                <span className="text-ink-3 ml-auto font-mono text-[10px]">
                   {f.size}
                 </span>
               </button>
@@ -2402,15 +2409,15 @@ function ExecutionHero({
           <div className="mt-1.5 flex items-baseline gap-2">
             <ExecutionVerdict status={execution.status} />
             {execution.duration_ms != null && (
-              <span className="text-ink-4 font-mono text-[12px]">
+              <span className="text-ink-3 font-mono text-[12px]">
                 {formatDuration(execution.duration_ms)}
               </span>
             )}
-            <span className="text-ink-4 text-[12px]">
+            <span className="text-ink-3 text-[12px]">
               <RelativeTime iso={execution.created_at} />
             </span>
             {execution.trigger === "auto" && (
-              <span className="text-ink-4 text-[11px]">auto</span>
+              <span className="text-ink-3 text-[11px]">auto</span>
             )}
           </div>
           {total > 0 && (
@@ -2599,13 +2606,13 @@ function ResultRow({
           {result.test_id}
         </span>
         {result.duration_ms != null && (
-          <span className="text-ink-4 shrink-0 font-mono text-[11px]">
+          <span className="text-ink-3 shrink-0 font-mono text-[11px]">
             {formatDuration(result.duration_ms)}
           </span>
         )}
         <span
           className={cn(
-            "shrink-0 rounded-[3px] px-1.5 py-px text-[10.5px] font-medium",
+            "shrink-0 rounded-sm px-1.5 py-px text-[10.5px] font-medium",
             result.outcome === "passed" && "bg-ok-soft text-ok-ink",
             result.outcome === "failed" && "bg-err-soft text-err-ink",
             result.outcome === "errored" && "bg-warn-soft text-warn-ink",

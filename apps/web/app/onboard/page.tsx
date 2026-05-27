@@ -83,40 +83,47 @@ export default function OnboardPage() {
 
   return (
     <PageContainer size="narrow" className="py-8">
-      <div className="mb-7 flex items-center">
+      <ol
+        role="list"
+        aria-label="Setup steps"
+        className="mb-8 flex items-center"
+      >
         {STEPS.map((s, i) => (
-          <div key={i} className="flex flex-1 items-center last:flex-initial">
+          <li key={i} className="flex flex-1 items-center last:flex-initial">
             <div
+              aria-current={i === step ? "step" : undefined}
               className={cn(
-                "flex items-center gap-2 text-[12.5px]",
+                "flex items-center gap-2 text-sm",
                 i === step && "text-foreground font-medium",
                 i < step && "text-ok-ink",
-                i > step && "text-ink-4",
+                i > step && "text-ink-3",
               )}
             >
               <span
                 className={cn(
-                  "grid size-6 place-items-center rounded-full border text-[11px] font-semibold",
+                  "grid size-6 place-items-center rounded-full border text-xs font-semibold",
                   i === step && "border-foreground bg-foreground text-background",
-                  i < step && "border-ok bg-ok text-white",
-                  i > step && "border-border text-ink-4",
+                  i < step && "border-ok-ink bg-ok-ink text-white",
+                  i > step && "border-border text-ink-3",
                 )}
               >
-                {i < step ? <CheckIcon className="size-[12px]" /> : i + 1}
+                {i < step ? <CheckIcon aria-hidden className="size-[12px]" /> : i + 1}
+                <span className="sr-only">{i < step ? "Completed: " : i === step ? "Current: " : "Upcoming: "}{s}</span>
               </span>
-              {s}
+              <span aria-hidden>{s}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div
+                aria-hidden
                 className={cn(
                   "mx-3 h-px flex-1",
-                  i < step ? "bg-ok" : "bg-border",
+                  i < step ? "bg-ok-ink/50" : "bg-border",
                 )}
               />
             )}
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
 
       <div className="border-border bg-card rounded-lg border p-6">
         <h2 className="text-[24px] leading-tight font-semibold tracking-[-0.02em]">

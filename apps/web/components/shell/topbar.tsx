@@ -45,19 +45,24 @@ function RunBadge({ status }: { status?: string }) {
       ? "Awaiting you"
       : runStatusLabel(status)
   return (
-    <Badge variant={variant} className="gap-1.5">
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          variant === "accent" && "bg-accent-ink animate-pulse",
-          variant === "warn" && "bg-warn-ink",
-          variant === "ok" && "bg-ok-ink",
-          variant === "err" && "bg-err-ink",
-          variant === "muted" && "bg-ink-4",
-        )}
-      />
-      {label}
-    </Badge>
+    /* aria-live so status transitions ("Live" → "Awaiting you" → "Completed")
+     * are announced to screen readers without requiring focus. */
+    <div aria-live="polite" aria-atomic="true">
+      <Badge variant={variant} className="gap-1.5">
+        <span
+          aria-hidden
+          className={cn(
+            "size-1.5 rounded-full",
+            variant === "accent" && "bg-accent-ink motion-safe:animate-pulse",
+            variant === "warn" && "bg-warn-ink",
+            variant === "ok" && "bg-ok-ink",
+            variant === "err" && "bg-err-ink",
+            variant === "muted" && "bg-ink-3",
+          )}
+        />
+        {label}
+      </Badge>
+    </div>
   )
 }
 
@@ -71,16 +76,20 @@ export function Topbar() {
       data-slot="topbar"
       className="border-border bg-background flex h-[52px] shrink-0 items-center gap-3 border-b px-4"
     >
-      <SidebarTrigger className="text-ink-3 hover:text-foreground -ml-1" />
+      {/* SidebarTrigger is an icon-only button — add accessible label */}
+      <SidebarTrigger
+        aria-label="Toggle sidebar"
+        className="text-ink-3 hover:text-foreground -ml-1 transition-colors"
+      />
 
-      <div className="flex min-w-0 items-center gap-2 text-[13px]">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
         {items.map((c, i) => {
           const content = (
             <span
               className={cn(
                 c.muted && "text-ink-3",
                 c.mono &&
-                  "text-foreground bg-muted rounded-[3px] px-1.5 py-0.5 font-mono text-[12px]",
+                  "text-foreground bg-muted rounded-sm px-1.5 py-0.5 font-mono text-xs",
               )}
             >
               {c.label}
@@ -88,9 +97,9 @@ export function Topbar() {
           )
           return (
             <span key={i} className="flex items-center gap-2">
-              {i > 0 && <ChevronRightIcon className="text-ink-4 size-[13px]" />}
+              {i > 0 && <ChevronRightIcon aria-hidden className="text-ink-3 size-[13px]" />}
               {c.href ? (
-                <Link href={c.href} className="hover:text-foreground">
+                <Link href={c.href} className="hover:text-foreground transition-colors">
                   {content}
                 </Link>
               ) : (
@@ -99,9 +108,9 @@ export function Topbar() {
             </span>
           )
         })}
-      </div>
+      </nav>
 
-      <div className="ml-auto flex items-center gap-2.5">
+      <div className="ml-auto flex items-center gap-2">
         {rightSlot === "run" && (
           <>
             <RunBadge status={runSlot.runStatus} />
@@ -110,7 +119,7 @@ export function Topbar() {
                 href={runSlot.exportReportHref}
                 className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
               >
-                <FileTextIcon className="size-[13px]" />
+                <FileTextIcon aria-hidden className="size-[13px]" />
                 Export report
               </Link>
             )}
@@ -119,7 +128,7 @@ export function Topbar() {
                 href={runSlot.openTestHref}
                 className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
               >
-                <ExternalLinkIcon className="size-[13px]" />
+                <ExternalLinkIcon aria-hidden className="size-[13px]" />
                 Open feature test
               </Link>
             )}
@@ -129,17 +138,14 @@ export function Topbar() {
           <button
             type="button"
             onClick={() => {
-              // Synthesise the ⌘K keystroke. The CommandPalette listens for
-              // it as the canonical open trigger so we route through one
-              // path.
               window.dispatchEvent(
                 new KeyboardEvent("keydown", { key: "k", metaKey: true }),
               )
             }}
-            className="border-border bg-card hover:bg-muted text-ink-2 hover:text-foreground inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-[12.5px]"
+            className="border-border bg-card hover:bg-muted text-ink-2 hover:text-foreground inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Open command palette"
           >
-            <SearchIcon className="size-[13px]" />
+            <SearchIcon aria-hidden className="size-[13px]" />
             <span>Search</span>
             <Kbd>⌘K</Kbd>
           </button>

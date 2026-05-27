@@ -64,6 +64,37 @@
     --radius-2xl: 12px;
     --radius-3xl: 16px;
     --radius-4xl: 20px;
+
+    /* ── Canonical type scale ────────────────────────────────────────
+     * Every component should use one of these tokens instead of
+     * arbitrary text-[Npx] values. Keeps the whole UI in sync and
+     * allows a future one-line scale adjustment.
+     *
+     * Tailwind v4 @theme inline maps these to font-size utilities:
+     *   text-2xs  → 11px  (metadata, timestamps, mono labels)
+     *   text-xs   → 12px  (small labels, badges, hints)
+     *   text-sm   → 13px  (secondary body, table cells)
+     *   text-base → 14px  (primary body — overrides browser 16px default)
+     *   text-md   → 15px  (prominent body, sub-headings)
+     *   text-lg   → 16px  (section headers, card titles)
+     *   text-xl   → 18px  (page-level sub-titles)
+     *   text-2xl  → 20px  (page titles, modal headings)
+     *   text-3xl  → 24px  (hero titles)
+     *   text-4xl  → 28px  (display, marketing headings)
+     * ──────────────────────────────────────────────────────────── */
+    --text-2xs: 11px;
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-base: 14px;
+    --text-md: 15px;
+    --text-lg: 16px;
+    --text-xl: 18px;
+    --text-2xl: 20px;
+    --text-3xl: 24px;
+    --text-4xl: 28px;
+    --leading-base: 1.5;
+    --leading-snug: 1.375;
+    --leading-relaxed: 1.625;
 }
 
 /*
@@ -206,8 +237,10 @@
     }
     body {
         @apply bg-background text-foreground;
-        font-size: 13.5px;
-        line-height: 1.5;
+        /* 14px base — slightly larger than before (13.5px) for
+         * WCAG readability; all relative text sizes scale with it. */
+        font-size: var(--text-base, 14px);
+        line-height: var(--leading-base, 1.5);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         font-feature-settings: "ss01", "cv11";
@@ -216,12 +249,30 @@
         @apply font-sans;
     }
     ::selection {
-        background: oklch(0.145 0 0);
-        color: oklch(0.985 0 0);
+        background: var(--foreground);
+        color: var(--background);
     }
     .dark ::selection {
-        background: oklch(0.985 0 0);
-        color: oklch(0.145 0 0);
+        background: var(--foreground);
+        color: var(--background);
+    }
+}
+
+/* ── prefers-reduced-motion ──────────────────────────────────────────
+ * Disable all continuous/decorative animations for users who
+ * have requested reduced motion at the OS level (WCAG 2.1 § 2.3.3).
+ * The `motion-safe:` Tailwind variant gates per-class usage; this
+ * block covers any CSS-driven keyframe animations we can't gate
+ * per-element (e.g. probe-pulse on status dots).
+ * ──────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }
 

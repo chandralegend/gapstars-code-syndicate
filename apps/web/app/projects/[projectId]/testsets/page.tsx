@@ -63,7 +63,17 @@ export default function TestsetsListPage({
     )
   }
   if (!project) {
-    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+    return (
+      <div role="status" aria-label="Loading feature tests" className="px-6 py-10 space-y-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="border-border flex items-center gap-4 rounded-lg border px-4 py-3">
+            <div className="bg-muted h-4 flex-1 animate-pulse rounded motion-reduce:animate-none" />
+            <div className="bg-muted h-5 w-20 animate-pulse rounded motion-reduce:animate-none" />
+          </div>
+        ))}
+        <span className="sr-only">Loading feature tests…</span>
+      </div>
+    )
   }
 
   const subtitleParts: string[] = [

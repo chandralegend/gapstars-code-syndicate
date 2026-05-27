@@ -29,7 +29,7 @@ export function StatCard({
         <span className="text-[26px] leading-none font-semibold tracking-[-0.02em]">
           {value}
         </span>
-        {unit && <span className="text-ink-4 font-mono text-[12px]">{unit}</span>}
+        {unit && <span className="text-ink-3 font-mono text-xs">{unit}</span>}
       </div>
       {delta && (
         <div
@@ -37,7 +37,7 @@ export function StatCard({
             "mt-2 text-[11.5px] font-mono",
             deltaKind === "up" && "text-ok-ink",
             deltaKind === "down" && "text-err-ink",
-            !deltaKind && "text-ink-4"
+            !deltaKind && "text-ink-3"
           )}
         >
           {delta}

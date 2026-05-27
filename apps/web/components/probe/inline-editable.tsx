@@ -29,7 +29,7 @@ export function InlineEditable({
       <input
         ref={inputRef}
         className={cn(
-          "border-border bg-card focus:ring-ring/40 inline-flex rounded-[4px] border px-1.5 py-[2px] text-[inherit] outline-none focus:ring-2",
+          "border-border bg-card focus:ring-ring/40 inline-flex rounded-sm border px-1.5 py-[2px] text-[inherit] outline-none focus:ring-2",
           className
         )}
         value={draft ?? ""}
@@ -55,7 +55,7 @@ export function InlineEditable({
         if (e.key === "Enter") setDraft(value)
       }}
       className={cn(
-        "hover:bg-muted cursor-text rounded-[4px] px-[3px] py-px",
+        "hover:bg-muted cursor-text rounded-sm px-[3px] py-px",
         className
       )}
     >

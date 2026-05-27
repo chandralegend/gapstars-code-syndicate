@@ -84,7 +84,7 @@ function QALoopMark() {
   return (
     <div
       aria-hidden
-      className="border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground grid size-[26px] place-items-center rounded-[5px] border font-mono text-[10.5px] font-semibold tracking-tight"
+      className="border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground grid size-[26px] place-items-center rounded-md border font-mono text-[10.5px] font-semibold tracking-tight"
     >
       QL
     </div>
@@ -117,36 +117,42 @@ export function AppSidebar() {
         : pathname === it.href || pathname.startsWith(it.href + "/")
       const Icon = it.icon
       return (
-        <SidebarMenuItem key={`${it.href}-${it.label}`}>
-          <SidebarMenuButton
-            isActive={active}
-            tooltip={it.label}
-            render={
-              <Link
-                href={it.href}
-                aria-current={active ? "page" : undefined}
-                prefetch
-              />
-            }
-            className={cn(
-              "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
-              "hover:bg-sidebar-accent/70",
-            )}
-          >
-            <Icon className="size-[15px] opacity-85" />
-            <span>{it.label}</span>
-            {it.badge && (
-              <SidebarMenuBadge
-                className={cn(
-                  "ml-auto font-mono text-[10.5px]",
-                  active
-                    ? "bg-accent text-sidebar"
-                    : "bg-sidebar-border text-sidebar-foreground/60",
-                )}
-              >
-                {it.badge}
-              </SidebarMenuBadge>
-            )}
+         <SidebarMenuItem key={`${it.href}-${it.label}`}>
+           <SidebarMenuButton
+             isActive={active}
+             tooltip={it.label}
+             render={
+               <Link
+                 href={it.href}
+                 aria-current={active ? "page" : undefined}
+                 prefetch
+               />
+             }
+             className={cn(
+               /* Active: left border indicator instead of background fill.
+                * This prevents confusion with the neutral-grey badge accent
+                * that also appears in the main content area. */
+               "relative transition-colors",
+               active
+                 ? "text-sidebar-accent-foreground font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-r-full before:bg-foreground before:opacity-80"
+                 : "text-sidebar-foreground/80",
+               "hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+             )}
+           >
+             <Icon className={cn("size-[15px]", active ? "opacity-100" : "opacity-70")} />
+             <span>{it.label}</span>
+             {it.badge && (
+               <SidebarMenuBadge
+                 className={cn(
+                   "ml-auto font-mono text-xs",
+                   active
+                     ? "bg-foreground/10 text-sidebar-accent-foreground"
+                     : "bg-sidebar-border text-sidebar-foreground/60",
+                 )}
+               >
+                 {it.badge}
+               </SidebarMenuBadge>
+             )}
           </SidebarMenuButton>
         </SidebarMenuItem>
       )
@@ -154,8 +160,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border border-r">
-      <SidebarHeader className="gap-3 px-3 pt-3.5">
-        <div className="flex items-center gap-2.5 px-1">
+      <SidebarHeader className="gap-3 px-3 pt-4">
+        <div className="flex items-center gap-2 px-1">
           <QALoopMark />
           <div className="text-sidebar-foreground font-sans text-[15px] leading-none font-semibold tracking-[-0.01em] group-data-[state=collapsed]:hidden">
             QALoop
@@ -165,23 +171,23 @@ export function AppSidebar() {
         {project && (
           <Link
             href="/projects"
-            className="bg-sidebar-accent/60 border-sidebar-border hover:bg-sidebar-accent group/proj mt-1 flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left group-data-[state=collapsed]:hidden"
+            className="bg-sidebar-accent/60 border-sidebar-border hover:bg-sidebar-accent group/proj mt-1 flex items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors group-data-[state=collapsed]:hidden"
           >
             <span
               aria-hidden
-              className="bg-sidebar-accent text-accent-ink border-sidebar-border grid size-[24px] place-items-center rounded-[5px] border font-mono text-[10.5px] font-semibold tracking-tight"
+              className="bg-sidebar-accent text-accent-ink border-sidebar-border grid size-6 place-items-center rounded-md border font-mono text-xs font-semibold tracking-tight"
             >
               {project.name.slice(0, 2).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="text-sidebar-foreground block truncate text-[12.5px] font-medium">
+              <span className="text-sidebar-foreground block truncate text-sm font-medium">
                 {project.name}
               </span>
-              <span className="text-sidebar-foreground/60 block truncate text-[11px]">
+              <span className="text-sidebar-foreground/60 block truncate text-xs">
                 Switch project
               </span>
             </span>
-            <ChevronLeftIcon className="text-sidebar-foreground/50 size-[13px] transition-transform group-hover/proj:-translate-x-0.5" />
+            <ChevronLeftIcon aria-hidden className="text-sidebar-foreground/50 size-[13px] transition-transform group-hover/proj:-translate-x-0.5" />
           </Link>
         )}
       </SidebarHeader>

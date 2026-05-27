@@ -48,8 +48,15 @@ export default function ProjectsPage() {
         )}
 
         {loading && !projects && (
-          <div className="text-ink-3 py-12 text-center text-[13px]">
-            Loading projects…
+          <div role="status" aria-label="Loading projects" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border-border bg-card space-y-3 rounded-lg border p-5">
+                <div className="bg-muted h-4 w-3/4 animate-pulse rounded motion-reduce:animate-none" />
+                <div className="bg-muted h-3 w-full animate-pulse rounded motion-reduce:animate-none" />
+                <div className="bg-muted h-3 w-2/3 animate-pulse rounded motion-reduce:animate-none" />
+              </div>
+            ))}
+            <span className="sr-only">Loading projects…</span>
           </div>
         )}
 

@@ -80,7 +80,21 @@ export default function ProjectOverviewPage({
   }
 
   if (!project) {
-    return <div className="text-ink-3 px-6 py-10 text-[13px]">Loading…</div>
+    return (
+      <div role="status" aria-label="Loading" className="px-6 py-10 space-y-3">
+        <div className="bg-muted h-7 w-48 animate-pulse rounded motion-reduce:animate-none" />
+        <div className="bg-muted h-4 w-full animate-pulse rounded motion-reduce:animate-none" />
+        <div className="grid gap-4 pt-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="border-border bg-card space-y-2 rounded-lg border p-4">
+              <div className="bg-muted h-4 w-2/3 animate-pulse rounded motion-reduce:animate-none" />
+              <div className="bg-muted h-3 w-full animate-pulse rounded motion-reduce:animate-none" />
+            </div>
+          ))}
+        </div>
+        <span className="sr-only">Loading…</span>
+      </div>
+    )
   }
 
   const subtitleParts: string[] = [
@@ -99,7 +113,7 @@ export default function ProjectOverviewPage({
         sub={
           <span className="block">
             <span className="block">{project.description}</span>
-            <span className="text-ink-4 mt-1 block text-[12px]">
+            <span className="text-ink-3 mt-1 block text-[12px]">
               {subtitleParts.join(" · ")}
             </span>
           </span>
@@ -134,7 +148,7 @@ export default function ProjectOverviewPage({
             onClick={() =>
               router.push(`/projects/${project.id}/runs/${liveRun.id}`)
             }
-            className="border-border bg-card hover:border-ink-4/60 focus-visible:ring-foreground/30 mb-6 flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="border-border bg-card hover:border-ink-4/60 hover:bg-muted/30 focus-visible:ring-foreground/30 mb-6 flex w-full cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -146,13 +160,13 @@ export default function ProjectOverviewPage({
               <div className="mt-1 font-mono text-[12.5px]">
                 Run #{liveRun.id.slice(0, 8)}
               </div>
-              <div className="text-ink-4 mt-0.5 text-[11.5px]">
+              <div className="text-ink-3 mt-0.5 text-[11.5px]">
                 Started <RelativeTime iso={liveRun.created_at} />
               </div>
             </div>
             <span className="text-ink-3 inline-flex items-center gap-1 text-[12.5px]">
               Open
-              <ChevronRightIcon className="size-[13px]" />
+              <ChevronRightIcon aria-hidden className="size-[13px]" />
             </span>
           </button>
         )}
@@ -178,7 +192,7 @@ export default function ProjectOverviewPage({
                 onClick={() => router.push(`/projects/${project.id}/testsets`)}
               >
                 See all
-                <ChevronRightIcon className="size-[12px]" />
+                <ChevronRightIcon aria-hidden className="size-[12px]" />
               </Button>
             </div>
 
@@ -194,10 +208,10 @@ export default function ProjectOverviewPage({
                         `/projects/${project.id}/testsets/${t.id}`,
                       )
                     }
-                    className="border-border bg-card hover:border-ink-4/60 focus-visible:ring-foreground/30 group rounded-lg border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    className="border-border bg-card hover:border-ink-4/60 hover:bg-muted/30 focus-visible:ring-foreground/30 group cursor-pointer rounded-lg border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <div className="mb-1 flex items-center gap-2">
-                      <FlaskConicalIcon className="text-ink-3 size-[14px]" />
+                      <FlaskConicalIcon aria-hidden className="text-ink-3 size-[14px]" />
                       <Badge
                         variant={tone === "muted" ? "muted" : tone}
                         className="ml-auto"
@@ -209,7 +223,7 @@ export default function ProjectOverviewPage({
                     <div className="text-ink-3 mt-0.5 line-clamp-2 text-[12px]">
                       {t.feature_description}
                     </div>
-                    <div className="text-ink-4 mt-3 text-[11px]">
+                    <div className="text-ink-3 mt-3 text-[11px]">
                       <RelativeTime iso={t.created_at} />
                     </div>
                   </button>
@@ -227,7 +241,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
       <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
-        <FlaskConicalIcon className="size-[20px]" />
+        <FlaskConicalIcon aria-hidden className="size-[20px]" />
       </div>
       <div className="mt-3 text-[16px] font-medium">No feature tests yet</div>
       <div className="text-ink-3 mt-1 max-w-[420px] text-center text-[13px]">
