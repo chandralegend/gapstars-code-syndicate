@@ -95,8 +95,6 @@ export default function ProjectsPage() {
                   key={p.id}
                   href={`/projects/${p.id}`}
                   className={cn(
-                    // Staggered entrance: each card slides in 40ms after the previous.
-                    // `probe-slide-in` + `probe-stagger-N` sets animation-delay.
                     "probe-slide-in",
                     i === 0 && "probe-stagger-1",
                     i === 1 && "probe-stagger-2",
@@ -104,29 +102,28 @@ export default function ProjectsPage() {
                     i === 3 && "probe-stagger-4",
                     i === 4 && "probe-stagger-5",
                     i >= 5 && "probe-stagger-6",
-                    // Hover lift: the card rises 2px on hover with a subtle shadow
-                    // that communicates depth without breaking the flat aesthetic.
                     "group border-border bg-card flex flex-col rounded-lg border p-5",
-                    "hover:-translate-y-0.5 hover:border-ink-4/50",
-                    "hover:shadow-[0_2px_8px_oklch(0.13_0.005_260/0.10)]",
-                    "transition-[colors,transform,box-shadow] duration-150",
-                    "focus-visible:ring-foreground/30 focus-visible:ring-2 focus-visible:outline-none",
+                    "hover:-translate-y-0.5 hover:border-accent/40",
+                    "dark:hover:shadow-[0_4px_16px_oklch(0.74_0.17_195/0.10)]",
+                    "hover:shadow-[0_4px_16px_oklch(0.14_0.02_255/0.08)]",
+                    "transition-[border-color,transform,box-shadow] duration-200",
+                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
                   )}
                 >
-                  <div className="text-[15px] font-medium">{p.name}</div>
+                  {/* Project name using slightly larger weight for legibility */}
+                  <div className="text-md font-medium">{p.name}</div>
                   <p className="text-ink-3 mt-1 line-clamp-2 text-sm leading-relaxed">
                     {p.description}
                   </p>
-                  <div className="text-ink-3 mt-4 flex items-center gap-3 text-xs">
+                  <div className="text-ink-4 mt-4 flex items-center gap-3 text-xs">
                     <span className="flex items-center gap-1">
                       <FlaskConicalIcon aria-hidden className="size-[11px]" />
                       Feature tests
                     </span>
-                    {/* Arrow translates right on group hover — spatial feedback
-                     *  that signals this card is interactive. */}
+                    {/* Teal tint on the arrow on hover — uses the accent */}
                     <ChevronRightIcon
                       aria-hidden
-                      className="ml-auto size-[13px] transition-transform duration-150 group-hover:translate-x-0.5"
+                      className="ml-auto size-[13px] transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent"
                     />
                   </div>
                 </Link>

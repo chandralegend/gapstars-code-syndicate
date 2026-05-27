@@ -80,7 +80,7 @@ export function Topbar() {
   return (
     <div
       data-slot="topbar"
-      className="border-border bg-background flex h-[52px] shrink-0 items-center gap-3 border-b px-4"
+      className="border-border bg-background/95 backdrop-blur-sm flex h-[52px] shrink-0 items-center gap-3 border-b px-4"
     >
       {/* SidebarTrigger is an icon-only button — add accessible label */}
       <SidebarTrigger

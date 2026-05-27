@@ -8,9 +8,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        default: "bg-primary text-primary-foreground hover:bg-primary/85",
         accent:
-          "bg-accent text-primary font-semibold hover:bg-accent/85 focus-visible:ring-accent/40",
+          // Brand teal — now the accent token is a vivid hue, not grey.
+          // Text uses accent-foreground which is set to near-black for contrast.
+          "bg-accent text-accent-foreground font-semibold hover:bg-accent/88 shadow-[0_1px_3px_oklch(0.74_0.17_195/0.35)] focus-visible:ring-accent/50",
         outline:
           "border-border bg-card shadow-xs hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

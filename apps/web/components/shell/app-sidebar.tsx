@@ -79,15 +79,24 @@ function buildProjectNav(projectId: string): NavItem[] {
 }
 
 function QALoopMark() {
-  // A 24px square, mono-style. The dot replaces the second 'O' so the
-  // mark reads as 'QAL○○P' at a glance; tightens to a clean square in
-  // the collapsed sidebar.
+  // The brand mark: a small square chip using the accent teal.
+  // The "Q" in Instrument Serif italic reads as a distinctive letterform
+  // — small enough to work as an icon, distinctive enough to be the brand.
   return (
     <div
       aria-hidden
-      className="border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground grid size-[26px] place-items-center rounded-md border font-mono text-[10.5px] font-semibold tracking-tight"
+      className="grid size-6 shrink-0 place-items-center rounded-md font-serif italic"
+      style={{
+        background: "oklch(0.74 0.17 195)",
+        color: "oklch(0.10 0.02 263)",
+        fontSize: "14px",
+        fontWeight: "400",
+        lineHeight: 1,
+        letterSpacing: "-0.01em",
+        boxShadow: "0 1px 3px oklch(0.74 0.17 195 / 0.4)",
+      }}
     >
-      QL
+      Q
     </div>
   )
 }
@@ -135,7 +144,7 @@ export function AppSidebar() {
                 * that also appears in the main content area. */
                "relative transition-colors",
                active
-                 ? "text-sidebar-accent-foreground font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-r-full before:bg-foreground before:opacity-80"
+                 ? "text-sidebar-accent-foreground font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-r-full before:bg-accent before:opacity-90"
                  : "text-sidebar-foreground/80",
                "hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
              )}
@@ -164,7 +173,10 @@ export function AppSidebar() {
       <SidebarHeader className="gap-3 px-3 pt-4">
         <div className="flex items-center gap-2 px-1">
           <QALoopMark />
-          <div className="text-sidebar-foreground font-sans text-[15px] leading-none font-semibold tracking-[-0.01em] group-data-[state=collapsed]:hidden">
+          {/* Instrument Serif italic for the product name — editorial serif
+           *  against the mono/sans UI text creates the brand's signature
+           *  typographic moment even at small sidebar scale. */}
+          <div className="font-serif text-[18px] leading-none font-normal tracking-[-0.01em] italic text-sidebar-foreground group-data-[state=collapsed]:hidden" style={{ color: "oklch(0.92 0.008 265)" }}>
             QALoop
           </div>
         </div>

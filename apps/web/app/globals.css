@@ -5,7 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
+    /* Instrument Serif for display headings; Geist for body/UI */
+    --font-heading: var(--font-serif);
     --font-sans: var(--font-sans);
     --font-serif: var(--font-serif);
     --font-mono: var(--font-mono);
@@ -58,30 +59,14 @@
     --color-info-ink: var(--info-ink);
 
     --radius-sm: 4px;
-    --radius-md: 6px;
+    --radius-md: 5px;
     --radius-lg: 8px;
     --radius-xl: 10px;
     --radius-2xl: 12px;
     --radius-3xl: 16px;
     --radius-4xl: 20px;
 
-    /* ── Canonical type scale ────────────────────────────────────────
-     * Every component should use one of these tokens instead of
-     * arbitrary text-[Npx] values. Keeps the whole UI in sync and
-     * allows a future one-line scale adjustment.
-     *
-     * Tailwind v4 @theme inline maps these to font-size utilities:
-     *   text-2xs  → 11px  (metadata, timestamps, mono labels)
-     *   text-xs   → 12px  (small labels, badges, hints)
-     *   text-sm   → 13px  (secondary body, table cells)
-     *   text-base → 14px  (primary body — overrides browser 16px default)
-     *   text-md   → 15px  (prominent body, sub-headings)
-     *   text-lg   → 16px  (section headers, card titles)
-     *   text-xl   → 18px  (page-level sub-titles)
-     *   text-2xl  → 20px  (page titles, modal headings)
-     *   text-3xl  → 24px  (hero titles)
-     *   text-4xl  → 28px  (display, marketing headings)
-     * ──────────────────────────────────────────────────────────── */
+    /* ── Canonical type scale ──────────────────────────────────────── */
     --text-2xs: 11px;
     --text-xs: 12px;
     --text-sm: 13px;
@@ -97,136 +82,148 @@
     --leading-relaxed: 1.625;
 }
 
-/*
- * Light theme — Vercel-leaning. Neutrals tinted toward hue 260 (blue-grey)
- * at chroma 0.003-0.005 to avoid the cold, sterile quality of pure
- * achromatic values while remaining perceptually neutral.
- */
+/* ── Light mode ───────────────────────────────────────────────────────
+ *
+ * Instrument panel. Three clearly distinguishable surfaces:
+ *   background — warm-white field (bone, not pure white)
+ *   card       — true white for content surfaces
+ *   sidebar    — slightly cooler, creating clear left-rail identity
+ *
+ * Accent: electric teal oklch(0.74 0.17 195) — vivid, data-positive,
+ * reads as "system active" without looking like a consumer brand.
+ * Used only for primary CTAs and the brand mark.
+ * ──────────────────────────────────────────────────────────────────── */
 :root {
     --radius: 6px;
 
-    --background: oklch(0.995 0.003 260);
-    --foreground: oklch(0.13 0.005 260);
-    --card: oklch(0.998 0.002 260);
-    --card-foreground: oklch(0.13 0.005 260);
-    --popover: oklch(0.998 0.002 260);
-    --popover-foreground: oklch(0.13 0.005 260);
+    --background: oklch(0.968 0.006 265);
+    --foreground: oklch(0.14 0.02 255);
+    --card: oklch(0.998 0.002 265);
+    --card-foreground: oklch(0.14 0.02 255);
+    --popover: oklch(0.998 0.002 265);
+    --popover-foreground: oklch(0.14 0.02 255);
 
-    --primary: oklch(0.13 0.005 260);
-    --primary-foreground: oklch(0.995 0.003 260);
+    /* Primary = deep navy-black for text and default buttons */
+    --primary: oklch(0.18 0.025 260);
+    --primary-foreground: oklch(0.97 0.004 265);
 
-    --secondary: oklch(0.965 0.004 260);
-    --secondary-foreground: oklch(0.13 0.005 260);
+    --secondary: oklch(0.940 0.008 265);
+    --secondary-foreground: oklch(0.18 0.025 260);
 
-    --muted: oklch(0.965 0.004 260);
-    --muted-foreground: oklch(0.50 0.005 260);
+    --muted: oklch(0.940 0.008 265);
+    --muted-foreground: oklch(0.50 0.012 265);
 
-    /*
-     * Accent = row hover / subtle highlight. Not a brand hue.
-     * Primary actions use `primary` (near-black fill).
-     */
-    --accent: oklch(0.965 0.004 260);
-    --accent-foreground: oklch(0.13 0.005 260);
-    --accent-soft: oklch(0.965 0.004 260);
-    --accent-ink: oklch(0.13 0.005 260);
+    /* Accent = electric teal — the brand color. Used on primary CTAs,
+     * the QL mark, the running status dot, and active state indicators.
+     * All downstream ink/soft variants calibrated to pass WCAG AA. */
+    --accent: oklch(0.74 0.17 195);
+    --accent-foreground: oklch(0.14 0.02 255);
+    --accent-soft: oklch(0.940 0.040 195);
+    --accent-ink: oklch(0.25 0.09 200);
 
     --destructive: oklch(0.577 0.245 27.325);
 
-    --border: oklch(0.910 0.004 260);
-    --input: oklch(0.910 0.004 260);
-    --ring: oklch(0.68 0.004 260);
+    --border: oklch(0.895 0.010 265);
+    --input: oklch(0.895 0.010 265);
+    --ring: oklch(0.74 0.17 195);
 
-    --ink-2: oklch(0.20 0.005 260);
-    --ink-3: oklch(0.45 0.005 260);
-    --ink-4: oklch(0.68 0.004 260);
-    --line-2: oklch(0.955 0.004 260);
+    --ink-2: oklch(0.22 0.018 258);
+    --ink-3: oklch(0.46 0.012 263);
+    --ink-4: oklch(0.68 0.008 263);
+    --line-2: oklch(0.945 0.008 265);
 
-    --ok: oklch(0.58 0.14 162);
-    --ok-soft: oklch(0.965 0.04 162);
-    --ok-ink: oklch(0.36 0.10 162);
-    --warn: oklch(0.74 0.16 75);
-    --warn-soft: oklch(0.965 0.05 80);
-    --warn-ink: oklch(0.42 0.13 70);
+    --ok: oklch(0.58 0.15 162);
+    --ok-soft: oklch(0.945 0.04 162);
+    --ok-ink: oklch(0.32 0.11 162);
+    --warn: oklch(0.72 0.17 78);
+    --warn-soft: oklch(0.945 0.05 82);
+    --warn-ink: oklch(0.38 0.13 70);
     --err: oklch(0.577 0.245 27.325);
-    --err-soft: oklch(0.965 0.04 25);
-    --err-ink: oklch(0.38 0.18 27.325);
-    --info: oklch(0.6 0.118 240);
-    --info-soft: oklch(0.965 0.03 240);
-    --info-ink: oklch(0.38 0.13 240);
+    --err-soft: oklch(0.945 0.04 25);
+    --err-ink: oklch(0.36 0.18 27.325);
+    --info: oklch(0.62 0.14 240);
+    --info-soft: oklch(0.945 0.03 240);
+    --info-ink: oklch(0.34 0.12 240);
 
-    /*
-     * Sidebar: slightly cooler (more blue-grey) than the page to
-     * create separation via surface identity, not a dark rail.
-     */
-    --sidebar: oklch(0.990 0.004 260);
-    --sidebar-foreground: oklch(0.20 0.005 260);
-    --sidebar-primary: oklch(0.13 0.005 260);
-    --sidebar-primary-foreground: oklch(0.995 0.003 260);
-    --sidebar-accent: oklch(0.955 0.004 260);
-    --sidebar-accent-foreground: oklch(0.13 0.005 260);
-    --sidebar-border: oklch(0.910 0.004 260);
-    --sidebar-ring: oklch(0.68 0.004 260);
+    /* Sidebar: steel-blue tinted, visibly distinct from page background */
+    --sidebar: oklch(0.950 0.012 262);
+    --sidebar-foreground: oklch(0.22 0.018 258);
+    --sidebar-primary: oklch(0.74 0.17 195);
+    --sidebar-primary-foreground: oklch(0.14 0.02 255);
+    --sidebar-accent: oklch(0.920 0.014 262);
+    --sidebar-accent-foreground: oklch(0.18 0.025 260);
+    --sidebar-border: oklch(0.880 0.012 263);
+    --sidebar-ring: oklch(0.74 0.17 195);
 }
 
-/*
- * Dark theme — near-black surfaces tinted toward hue 260.
- * Not pure black: oklch(0.05 0.003 260) avoids the "void" quality
- * of absolute black while remaining effectively dark.
- */
+/* ── Dark mode ────────────────────────────────────────────────────────
+ *
+ * Deep navy field. This is the primary experience — a QA engineer
+ * at their desk watching live agents. Status colors are vivid against
+ * the dark ground. The teal accent glows against the dark navy.
+ *
+ * Three surfaces:
+ *   background — deep navy oklch(0.12 0.028 263) — not black, a real hue
+ *   card       — raised slate oklch(0.17 0.024 263)
+ *   sidebar    — deepest rail oklch(0.09 0.022 263)
+ * ──────────────────────────────────────────────────────────────────── */
 .dark {
-    --background: oklch(0.05 0.003 260);
-    --foreground: oklch(0.965 0.004 260);
-    --card: oklch(0.10 0.004 260);
-    --card-foreground: oklch(0.965 0.004 260);
-    --popover: oklch(0.10 0.004 260);
-    --popover-foreground: oklch(0.965 0.004 260);
+    --background: oklch(0.12 0.028 263);
+    --foreground: oklch(0.94 0.008 265);
+    --card: oklch(0.17 0.024 263);
+    --card-foreground: oklch(0.94 0.008 265);
+    --popover: oklch(0.17 0.024 263);
+    --popover-foreground: oklch(0.94 0.008 265);
 
-    --primary: oklch(0.965 0.004 260);
-    --primary-foreground: oklch(0.13 0.005 260);
+    --primary: oklch(0.94 0.008 265);
+    --primary-foreground: oklch(0.12 0.028 263);
 
-    --secondary: oklch(0.16 0.005 260);
-    --secondary-foreground: oklch(0.965 0.004 260);
+    --secondary: oklch(0.22 0.022 263);
+    --secondary-foreground: oklch(0.94 0.008 265);
 
-    --muted: oklch(0.155 0.005 260);
-    --muted-foreground: oklch(0.62 0.005 260);
+    --muted: oklch(0.20 0.022 263);
+    --muted-foreground: oklch(0.60 0.012 263);
 
-    --accent: oklch(0.155 0.005 260);
-    --accent-foreground: oklch(0.965 0.004 260);
-    --accent-soft: oklch(0.155 0.005 260);
-    --accent-ink: oklch(0.965 0.004 260);
+    /* Teal accent glows vividly on dark navy */
+    --accent: oklch(0.74 0.17 195);
+    --accent-foreground: oklch(0.10 0.02 263);
+    --accent-soft: oklch(0.20 0.060 195);
+    --accent-ink: oklch(0.88 0.14 195);
 
     --destructive: oklch(0.704 0.191 22.216);
 
-    --border: oklch(0.20 0.005 260);
-    --input: oklch(0.20 0.005 260);
-    --ring: oklch(0.43 0.005 260);
+    --border: oklch(0.24 0.022 263);
+    --input: oklch(0.22 0.022 263);
+    --ring: oklch(0.74 0.17 195);
 
-    --ink-2: oklch(0.84 0.005 260);
-    --ink-3: oklch(0.62 0.005 260);
-    --ink-4: oklch(0.48 0.005 260);
-    --line-2: oklch(0.18 0.005 260);
+    --ink-2: oklch(0.82 0.010 263);
+    --ink-3: oklch(0.60 0.012 263);
+    --ink-4: oklch(0.44 0.010 263);
+    --line-2: oklch(0.20 0.022 263);
 
-    --ok: oklch(0.72 0.17 162);
-    --ok-soft: oklch(0.18 0.05 162);
-    --ok-ink: oklch(0.88 0.14 162);
-    --warn: oklch(0.82 0.17 80);
-    --warn-soft: oklch(0.18 0.06 80);
-    --warn-ink: oklch(0.90 0.14 80);
-    --err: oklch(0.70 0.20 25);
-    --err-soft: oklch(0.20 0.08 25);
-    --err-ink: oklch(0.88 0.16 25);
-    --info: oklch(0.70 0.14 240);
-    --info-soft: oklch(0.18 0.05 240);
-    --info-ink: oklch(0.86 0.12 240);
+    /* Status colors brightened for dark bg — vivid, not pastel */
+    --ok: oklch(0.72 0.18 162);
+    --ok-soft: oklch(0.20 0.06 162);
+    --ok-ink: oklch(0.88 0.15 162);
+    --warn: oklch(0.82 0.18 80);
+    --warn-soft: oklch(0.22 0.07 80);
+    --warn-ink: oklch(0.90 0.15 80);
+    --err: oklch(0.72 0.22 25);
+    --err-soft: oklch(0.22 0.09 25);
+    --err-ink: oklch(0.90 0.18 25);
+    --info: oklch(0.70 0.16 240);
+    --info-soft: oklch(0.22 0.06 240);
+    --info-ink: oklch(0.86 0.14 240);
 
-    --sidebar: oklch(0.04 0.003 260);
-    --sidebar-foreground: oklch(0.62 0.005 260);
-    --sidebar-primary: oklch(0.965 0.004 260);
-    --sidebar-primary-foreground: oklch(0.13 0.005 260);
-    --sidebar-accent: oklch(0.16 0.005 260);
-    --sidebar-accent-foreground: oklch(0.965 0.004 260);
-    --sidebar-border: oklch(0.20 0.005 260);
-    --sidebar-ring: oklch(0.43 0.005 260);
+    /* Sidebar: deepest surface in the hierarchy */
+    --sidebar: oklch(0.09 0.022 263);
+    --sidebar-foreground: oklch(0.62 0.012 263);
+    --sidebar-primary: oklch(0.74 0.17 195);
+    --sidebar-primary-foreground: oklch(0.10 0.02 263);
+    --sidebar-accent: oklch(0.16 0.024 263);
+    --sidebar-accent-foreground: oklch(0.94 0.008 265);
+    --sidebar-border: oklch(0.20 0.022 263);
+    --sidebar-ring: oklch(0.74 0.17 195);
 }
 
 @layer base {
@@ -235,8 +232,6 @@
     }
     body {
         @apply bg-background text-foreground;
-        /* 14px base — slightly larger than before (13.5px) for
-         * WCAG readability; all relative text sizes scale with it. */
         font-size: var(--text-base, 14px);
         line-height: var(--leading-base, 1.5);
         -webkit-font-smoothing: antialiased;
@@ -246,23 +241,18 @@
     html {
         @apply font-sans;
     }
+    /* Selection uses accent teal */
     ::selection {
-        background: var(--foreground);
-        color: var(--background);
+        background: oklch(0.74 0.17 195 / 0.30);
+        color: var(--foreground);
     }
     .dark ::selection {
-        background: var(--foreground);
-        color: var(--background);
+        background: oklch(0.74 0.17 195 / 0.35);
+        color: var(--foreground);
     }
 }
 
-/* ── prefers-reduced-motion ──────────────────────────────────────────
- * Disable all continuous/decorative animations for users who
- * have requested reduced motion at the OS level (WCAG 2.1 § 2.3.3).
- * The `motion-safe:` Tailwind variant gates per-class usage; this
- * block covers any CSS-driven keyframe animations we can't gate
- * per-element (e.g. probe-pulse on status dots).
- * ──────────────────────────────────────────────────────────────── */
+/* ── prefers-reduced-motion ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

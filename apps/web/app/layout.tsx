@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
 
 import "./globals.css"
 import { AppShell } from "@/components/shell/app-shell"
@@ -13,6 +13,16 @@ const fontSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+})
+
+// Instrument Serif: editorial display font for h1 headings only.
+// The contrast between a refined serif at 28px+ and Geist at 13-15px
+// creates the single most memorable typographic moment in the product.
+const fontSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-serif",
 })
 
 export const metadata: Metadata = {
@@ -33,11 +43,12 @@ export default function RootLayout({
         "antialiased",
         fontSans.variable,
         fontMono.variable,
+        fontSerif.variable,
         "font-sans",
       )}
     >
       <body>
-        <ThemeProvider>
+        <ThemeProvider defaultTheme="dark" attribute="class">
           <TooltipProvider delay={150}>
             <AppShell>{children}</AppShell>
             <Toaster position="bottom-right" />
