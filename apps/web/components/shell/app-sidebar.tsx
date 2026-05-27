@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   ActivityIcon,
-  ChevronLeftIcon,
+  ChevronsUpDownIcon,
   FlaskConicalIcon,
   FolderIcon,
   LayoutDashboardIcon,
@@ -18,6 +18,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -187,7 +188,7 @@ export function AppSidebar() {
                 Switch project
               </span>
             </span>
-            <ChevronLeftIcon aria-hidden className="text-sidebar-foreground/50 size-[13px] transition-transform group-hover/proj:-translate-x-0.5" />
+            <ChevronsUpDownIcon aria-hidden className="text-sidebar-foreground/40 size-[13px] transition-transform group-hover/proj:scale-110" />
           </Link>
         )}
       </SidebarHeader>
@@ -201,6 +202,9 @@ export function AppSidebar() {
 
         {project && (
           <SidebarGroup>
+            <SidebarGroupLabel className="text-2xs text-sidebar-foreground/50 px-3 pt-2 pb-1 tracking-[0.12em] uppercase group-data-[state=collapsed]:hidden">
+              project
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>{renderNav(projectNav)}</SidebarMenu>
             </SidebarGroupContent>

@@ -133,13 +133,13 @@ const EVENT_LABEL: Record<string, string> = {
   node_end: "Finished",
   interrupt: "Awaiting your review",
   feedback_received: "Review submitted",
-  sandbox_task_created: "Sandbox started",
-  sandbox_task_progress: "Sandbox progress",
-  sandbox_task_completed: "Sandbox finished",
-  sandbox_task_failed: "Sandbox failed",
-  sandbox_task_recovered: "Sandbox finished with what it had",
-  sandbox_timeout_warning: "Sandbox running low on time",
-  sandbox_timeout_extended: "Sandbox got more time",
+  sandbox_task_created: "Exploration started",
+  sandbox_task_progress: "Exploring",
+  sandbox_task_completed: "Exploration finished",
+  sandbox_task_failed: "Exploration failed",
+  sandbox_task_recovered: "Exploration finished early",
+  sandbox_timeout_warning: "Running low on time",
+  sandbox_timeout_extended: "More time added",
   workflow_completed: "Run completed",
   script_bundle_started: "Script Builder started",
   script_bundle_progress: "Script Builder progress",
@@ -199,14 +199,14 @@ export function eventSummary(
     }
     case "sandbox_task_created": {
       const ts = typeof p.timeout_seconds === "number" ? p.timeout_seconds : null
-      return ts ? `Up to ${Math.round(ts / 60)}m to explore` : null
+      return ts ? `Up to ${Math.round(ts / 60)} min to explore` : null
     }
     case "sandbox_task_progress": {
       const s = String(p.status ?? "")
-      if (s === "queued") return "Waiting for a runner"
+      if (s === "queued") return "Queued"
       if (s === "running") return "Exploring the feature"
-      if (s === "succeeded") return "Exploration succeeded"
-      if (s === "failed") return "Exploration failed"
+      if (s === "succeeded") return "Complete"
+      if (s === "failed") return "Failed"
       return null
     }
     case "sandbox_timeout_extended": {
@@ -215,15 +215,11 @@ export function eventSummary(
     }
     case "sandbox_task_completed":
     case "sandbox_task_recovered": {
-      const files = Array.isArray(p.files) ? p.files.length : null
       const screens = Array.isArray(p.files)
         ? (p.files as string[]).filter((f) => f.includes("screenshots/")).length
         : 0
-      if (files == null) return null
-      if (screens > 0) {
-        return `${files} files captured, ${screens} screenshots`
-      }
-      return `${files} files captured`
+      if (screens > 0) return `${screens} screenshot${screens === 1 ? "" : "s"} captured`
+      return "Finished"
     }
     case "script_bundle_progress": {
       const phase = String(p.phase ?? p.step ?? "")

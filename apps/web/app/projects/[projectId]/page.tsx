@@ -244,13 +244,12 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         <FlaskConicalIcon aria-hidden className="size-[20px]" />
       </div>
       <div className="mt-3 text-[16px] font-medium">No feature tests yet</div>
-      <div className="text-ink-3 mt-1 max-w-[420px] text-center text-[13px]">
-        A feature test bundles a feature&apos;s brief, the agent&apos;s findings,
-        and the test cases that follow. Start by writing a short brief.
+      <div className="text-ink-3 mt-1 max-w-[420px] text-center text-sm">
+        Feature tests define what to check and how. Create one to start a QA run.
       </div>
-      <Button variant="accent" className="mt-5" onClick={onCreate}>
+      <Button variant="accent" className="mt-6" onClick={onCreate}>
         <PlusIcon className="size-[13px]" />
-        Create your first feature test
+        New feature test
       </Button>
     </div>
   )

@@ -98,137 +98,135 @@
 }
 
 /*
- * Light theme — Vercel-leaning. Pure white surfaces, near-black ink,
- * a single neutral accent (also near-black) so primary actions read as
- * "this one matters" instead of "this is branded orange". Status tones
- * carry meaning via colour as before.
+ * Light theme — Vercel-leaning. Neutrals tinted toward hue 260 (blue-grey)
+ * at chroma 0.003-0.005 to avoid the cold, sterile quality of pure
+ * achromatic values while remaining perceptually neutral.
  */
 :root {
     --radius: 6px;
 
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
+    --background: oklch(0.995 0.003 260);
+    --foreground: oklch(0.13 0.005 260);
+    --card: oklch(0.998 0.002 260);
+    --card-foreground: oklch(0.13 0.005 260);
+    --popover: oklch(0.998 0.002 260);
+    --popover-foreground: oklch(0.13 0.005 260);
 
-    --primary: oklch(0.145 0 0);
-    --primary-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.13 0.005 260);
+    --primary-foreground: oklch(0.995 0.003 260);
 
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.145 0 0);
+    --secondary: oklch(0.965 0.004 260);
+    --secondary-foreground: oklch(0.13 0.005 260);
 
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    --muted: oklch(0.965 0.004 260);
+    --muted-foreground: oklch(0.50 0.005 260);
 
     /*
-     * Accent in this system means "row hover / subtle highlight",
-     * not "brand colour". The semantic actions still go through
-     * `primary`, which is near-black.
+     * Accent = row hover / subtle highlight. Not a brand hue.
+     * Primary actions use `primary` (near-black fill).
      */
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.145 0 0);
-    --accent-soft: oklch(0.97 0 0);
-    --accent-ink: oklch(0.145 0 0);
+    --accent: oklch(0.965 0.004 260);
+    --accent-foreground: oklch(0.13 0.005 260);
+    --accent-soft: oklch(0.965 0.004 260);
+    --accent-ink: oklch(0.13 0.005 260);
 
     --destructive: oklch(0.577 0.245 27.325);
 
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: oklch(0.910 0.004 260);
+    --input: oklch(0.910 0.004 260);
+    --ring: oklch(0.68 0.004 260);
 
-    --ink-2: oklch(0.205 0 0);
-    --ink-3: oklch(0.5 0 0);
-    --ink-4: oklch(0.708 0 0);
-    --line-2: oklch(0.96 0 0);
+    --ink-2: oklch(0.20 0.005 260);
+    --ink-3: oklch(0.45 0.005 260);
+    --ink-4: oklch(0.68 0.004 260);
+    --line-2: oklch(0.955 0.004 260);
 
-    --ok: oklch(0.6 0.118 184.704);
-    --ok-soft: oklch(0.97 0.04 175);
-    --ok-ink: oklch(0.398 0.07 184.704);
-    --warn: oklch(0.769 0.188 70.08);
-    --warn-soft: oklch(0.97 0.06 80);
-    --warn-ink: oklch(0.45 0.15 70);
+    --ok: oklch(0.58 0.14 162);
+    --ok-soft: oklch(0.965 0.04 162);
+    --ok-ink: oklch(0.36 0.10 162);
+    --warn: oklch(0.74 0.16 75);
+    --warn-soft: oklch(0.965 0.05 80);
+    --warn-ink: oklch(0.42 0.13 70);
     --err: oklch(0.577 0.245 27.325);
-    --err-soft: oklch(0.97 0.04 25);
-    --err-ink: oklch(0.396 0.18 27.325);
+    --err-soft: oklch(0.965 0.04 25);
+    --err-ink: oklch(0.38 0.18 27.325);
     --info: oklch(0.6 0.118 240);
-    --info-soft: oklch(0.97 0.03 240);
-    --info-ink: oklch(0.398 0.13 240);
+    --info-soft: oklch(0.965 0.03 240);
+    --info-ink: oklch(0.38 0.13 240);
 
     /*
-     * Sidebar = page background. Vercel does not use a dark left rail
-     * when the rest of the app is light. We rely on a single border
-     * line for the boundary instead.
+     * Sidebar: slightly cooler (more blue-grey) than the page to
+     * create separation via surface identity, not a dark rail.
      */
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.205 0 0);
-    --sidebar-primary: oklch(0.145 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.95 0 0);
-    --sidebar-accent-foreground: oklch(0.145 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: oklch(0.990 0.004 260);
+    --sidebar-foreground: oklch(0.20 0.005 260);
+    --sidebar-primary: oklch(0.13 0.005 260);
+    --sidebar-primary-foreground: oklch(0.995 0.003 260);
+    --sidebar-accent: oklch(0.955 0.004 260);
+    --sidebar-accent-foreground: oklch(0.13 0.005 260);
+    --sidebar-border: oklch(0.910 0.004 260);
+    --sidebar-ring: oklch(0.68 0.004 260);
 }
 
 /*
- * Dark theme — true black / white. Surfaces lift off the page with a
- * single 1px border instead of a fill change.
+ * Dark theme — near-black surfaces tinted toward hue 260.
+ * Not pure black: oklch(0.05 0.003 260) avoids the "void" quality
+ * of absolute black while remaining effectively dark.
  */
 .dark {
-    --background: oklch(0 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
+    --background: oklch(0.05 0.003 260);
+    --foreground: oklch(0.965 0.004 260);
+    --card: oklch(0.10 0.004 260);
+    --card-foreground: oklch(0.965 0.004 260);
+    --popover: oklch(0.10 0.004 260);
+    --popover-foreground: oklch(0.965 0.004 260);
 
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.965 0.004 260);
+    --primary-foreground: oklch(0.13 0.005 260);
 
-    --secondary: oklch(0.205 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.16 0.005 260);
+    --secondary-foreground: oklch(0.965 0.004 260);
 
-    --muted: oklch(0.205 0 0);
-    --muted-foreground: oklch(0.708 0 0);
+    --muted: oklch(0.155 0.005 260);
+    --muted-foreground: oklch(0.62 0.005 260);
 
-    --accent: oklch(0.205 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --accent-soft: oklch(0.205 0 0);
-    --accent-ink: oklch(0.985 0 0);
+    --accent: oklch(0.155 0.005 260);
+    --accent-foreground: oklch(0.965 0.004 260);
+    --accent-soft: oklch(0.155 0.005 260);
+    --accent-ink: oklch(0.965 0.004 260);
 
     --destructive: oklch(0.704 0.191 22.216);
 
-    --border: oklch(0.205 0 0);
-    --input: oklch(0.205 0 0);
-    --ring: oklch(0.439 0 0);
+    --border: oklch(0.20 0.005 260);
+    --input: oklch(0.20 0.005 260);
+    --ring: oklch(0.43 0.005 260);
 
-    --ink-2: oklch(0.85 0 0);
-    --ink-3: oklch(0.65 0 0);
-    --ink-4: oklch(0.5 0 0);
-    --line-2: oklch(0.18 0 0);
+    --ink-2: oklch(0.84 0.005 260);
+    --ink-3: oklch(0.62 0.005 260);
+    --ink-4: oklch(0.48 0.005 260);
+    --line-2: oklch(0.18 0.005 260);
 
-    --ok: oklch(0.696 0.17 162.48);
+    --ok: oklch(0.72 0.17 162);
     --ok-soft: oklch(0.18 0.05 162);
-    --ok-ink: oklch(0.85 0.14 162);
-    --warn: oklch(0.769 0.188 70.08);
+    --ok-ink: oklch(0.88 0.14 162);
+    --warn: oklch(0.82 0.17 80);
     --warn-soft: oklch(0.18 0.06 80);
-    --warn-ink: oklch(0.88 0.14 80);
-    --err: oklch(0.704 0.191 22.216);
-    --err-soft: oklch(0.2 0.08 25);
-    --err-ink: oklch(0.85 0.16 25);
-    --info: oklch(0.696 0.13 240);
+    --warn-ink: oklch(0.90 0.14 80);
+    --err: oklch(0.70 0.20 25);
+    --err-soft: oklch(0.20 0.08 25);
+    --err-ink: oklch(0.88 0.16 25);
+    --info: oklch(0.70 0.14 240);
     --info-soft: oklch(0.18 0.05 240);
-    --info-ink: oklch(0.84 0.13 240);
+    --info-ink: oklch(0.86 0.12 240);
 
-    --sidebar: oklch(0 0 0);
-    --sidebar-foreground: oklch(0.708 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.145 0 0);
-    --sidebar-accent: oklch(0.205 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.205 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    --sidebar: oklch(0.04 0.003 260);
+    --sidebar-foreground: oklch(0.62 0.005 260);
+    --sidebar-primary: oklch(0.965 0.004 260);
+    --sidebar-primary-foreground: oklch(0.13 0.005 260);
+    --sidebar-accent: oklch(0.16 0.005 260);
+    --sidebar-accent-foreground: oklch(0.965 0.004 260);
+    --sidebar-border: oklch(0.20 0.005 260);
+    --sidebar-ring: oklch(0.43 0.005 260);
 }
 
 @layer base {

@@ -19,7 +19,7 @@ import { createProject, useMutation } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
 import { cn } from "@/lib/utils"
 
-const STEPS = ["Project", "Problem", "Context", "Anything else?", "Review"]
+const STEPS = ["Project", "Problem", "Context", "Extra context", "Review"]
 
 export default function OnboardPage() {
   useSetBreadcrumbs([
@@ -103,7 +103,7 @@ export default function OnboardPage() {
                 className={cn(
                   "grid size-6 place-items-center rounded-full border text-xs font-semibold",
                   i === step && "border-foreground bg-foreground text-background",
-                  i < step && "border-ok-ink bg-ok-ink text-white",
+                  i < step && "border-ok-ink bg-ok-ink text-background",
                   i > step && "border-border text-ink-3",
                 )}
               >
@@ -127,22 +127,22 @@ export default function OnboardPage() {
 
       <div className="border-border bg-card rounded-lg border p-6">
         <h2 className="text-[24px] leading-tight font-semibold tracking-[-0.02em]">
-          {step === 0 && "Tell us about the project"}
-          {step === 1 && "What problem does it solve?"}
-          {step === 2 && "Who uses it and how is it built?"}
-          {step === 3 && "Anything else worth knowing?"}
-          {step === 4 && "Ready to create the project"}
+          {step === 0 && "Name the project"}
+          {step === 1 && "Describe the problem"}
+          {step === 2 && "Add audience and tech context"}
+          {step === 3 && "Add extra context"}
+          {step === 4 && "Review and create"}
         </h2>
         <p className="text-ink-3 mt-1 mb-5 text-[13px]">
-          {step === 0 && "Name and a one-line description. Both required."}
+          {step === 0 && "Required to create a project."}
           {step === 1 &&
-            "A short problem statement helps Agent 1 frame each test set. Required."}
+            "Helps the system understand what to focus on when writing tests."}
           {step === 2 &&
             "Optional context about the audience and the tech stack."}
           {step === 3 &&
-            "Anything an outside QA contractor would ask in week one."}
+            "Anything a new QA engineer joining the project would want to know."}
           {step === 4 &&
-            "Review the inputs below and create the project. You can edit later."}
+            "Review your entries and create the project. You can update these later."}
         </p>
 
         {step === 0 && (
@@ -160,7 +160,7 @@ export default function OnboardPage() {
                 onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
                 }
-                placeholder="A direct-to-consumer marketplace for outdoor gear."
+                placeholder="e.g. Customer-facing e-commerce platform"
               />
             </Field>
           </div>
@@ -174,7 +174,7 @@ export default function OnboardPage() {
               onChange={(e) =>
                 setForm({ ...form, problem_statement: e.target.value })
               }
-              placeholder="What problem does this product solve, and why does that matter for QA?"
+              placeholder="e.g. Users abandon checkout because the cart flow has too many steps"
             />
           </Field>
         )}
@@ -188,7 +188,7 @@ export default function OnboardPage() {
                 onChange={(e) =>
                   setForm({ ...form, target_users: e.target.value })
                 }
-                placeholder="Internal QA engineers; mobile-first shoppers; SREs running test suites."
+                placeholder="e.g. Mobile-first consumers, internal QA teams"
               />
             </Field>
             <Field label="Tech stack (optional)">

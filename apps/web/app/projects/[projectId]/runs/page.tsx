@@ -102,61 +102,60 @@ export default function ProjectRunsPage({
           <div className="border-border bg-card flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
             <div className="bg-muted text-ink-3 grid size-12 place-items-center rounded-full">
               <ActivityIcon aria-hidden className="size-5" />
-            </div>
-            <div className="mt-3 text-base font-medium">No runs yet</div>
-            <p className="text-ink-3 mt-1 max-w-[380px] text-sm">
-              A run takes a feature test through all five phases — brief, sandbox, test cases, scripts, and execution.
-            </p>
-            <Button
-              variant="accent"
-              className="mt-5"
-              onClick={() => router.push(`/projects/${projectId}/testsets`)}
-            >
-              Open a feature test
-            </Button>
-          </div>
+             </div>
+             <div className="mt-3 text-base font-medium">No runs yet</div>
+             <p className="text-ink-3 mt-1 max-w-[380px] text-sm">
+               Runs execute a feature test end to end and capture the results. Open a feature test to start one.
+             </p>
+             <Button
+               variant="accent"
+               className="mt-6"
+               onClick={() => router.push(`/projects/${projectId}/testsets`)}
+             >
+               Open a feature test
+             </Button>
+           </div>
         ) : (
           <div className="border-border bg-card overflow-hidden rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Run</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Step</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {runs.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    className="cursor-pointer"
-                    onClick={() =>
-                      router.push(`/projects/${project.id}/runs/${r.id}`)
-                    }
-                  >
-                    <TableCell className="font-mono text-[12px]">
-                      #{r.id.slice(0, 8)}
-                    </TableCell>
-                    <TableCell>
-                      <RunStatusBadge status={r.status} />
-                    </TableCell>
-                    <TableCell className="text-ink-3 text-[12.5px]">
-                      {r.current_node ? nodeLabel(r.current_node) : "—"}
-                    </TableCell>
-                    <TableCell className="text-ink-3 text-[12.5px]">
-                      <RelativeTime iso={r.created_at} />
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm">
-                        Open
-                        <ChevronRightIcon className="size-[12px]" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+             <Table>
+               <TableHeader>
+                 <TableRow>
+                   <TableHead>Run</TableHead>
+                   <TableHead>Status</TableHead>
+                   <TableHead>Step</TableHead>
+                   <TableHead>Started</TableHead>
+                   <TableHead className="w-16">
+                     <span className="sr-only">Open</span>
+                   </TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {runs.map((r) => (
+                   <TableRow
+                     key={r.id}
+                     className="hover:bg-muted/50 cursor-pointer transition-colors"
+                     onClick={() =>
+                       router.push(`/projects/${project.id}/runs/${r.id}`)
+                     }
+                   >
+                     <TableCell className="font-mono text-xs">
+                       #{r.id.slice(0, 8)}
+                     </TableCell>
+                     <TableCell>
+                       <RunStatusBadge status={r.status} />
+                     </TableCell>
+                     <TableCell className="text-ink-3 text-sm">
+                       {r.current_node ? nodeLabel(r.current_node) : "—"}
+                     </TableCell>
+                     <TableCell className="text-ink-3 text-sm">
+                       <RelativeTime iso={r.created_at} />
+                     </TableCell>
+                     <TableCell>
+                       <ChevronRightIcon aria-hidden className="text-ink-3 size-4" />
+                     </TableCell>
+                   </TableRow>
+                 ))}
+               </TableBody>
             </Table>
           </div>
         )}

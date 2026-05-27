@@ -574,13 +574,12 @@ function Timeline({
         )}
       </div>
 
-      <CapLine className="mb-3">orchestration steps</CapLine>
+      <CapLine className="mb-3">progress</CapLine>
 
       <div className="space-y-2">
         {buckets.length === 0 ? (
           <div className="text-ink-3 px-1 text-[12.5px]">
-            The orchestration just started. The first event will arrive in a
-            few seconds.
+            Starting up. Events will appear here shortly.
           </div>
         ) : (
           buckets.map((b) => (
@@ -654,13 +653,12 @@ function NodeCard({
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls={`node-events-${bucket.node_name}`}
-          className="text-ink-3 hover:text-foreground ml-auto inline-flex cursor-pointer items-center gap-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
+          className="text-ink-3 hover:text-foreground ml-auto inline-flex cursor-pointer items-center gap-0.5 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
         >
-          {open ? (
-            <ChevronDownIcon aria-hidden className="size-[11px]" />
-          ) : (
-            <ChevronRightIcon aria-hidden className="size-[11px]" />
-          )}
+          <ChevronRightIcon
+            aria-hidden
+            className={cn("size-[11px] transition-transform duration-150 motion-safe:transition-transform", open && "rotate-90")}
+          />
           {eventCount} event{eventCount === 1 ? "" : "s"}
         </button>
       </div>
@@ -708,7 +706,7 @@ function EventLine({ e }: { e: SseEvent }) {
       </div>
       {hasPayload && (
         <details className="group/det mt-1">
-          <summary className="text-ink-3 hover:text-ink-3 cursor-pointer list-none text-[10.5px] select-none">
+          <summary className="text-ink-3 hover:text-foreground cursor-pointer list-none text-2xs select-none transition-colors duration-150">
             <span className="group-open/det:hidden">Show details</span>
             <span className="hidden group-open/det:inline">Hide details</span>
           </summary>
@@ -800,7 +798,7 @@ function RightPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-border border-b px-6 py-3.5">
+      <div className="border-border border-b px-6 py-4">
         <div className={cn(rail, "flex flex-wrap items-center gap-x-3 gap-y-2")}>
           <div className="min-w-0">
             <div className="text-[15px] font-semibold">{runPhaseTitle(status)}</div>
@@ -837,13 +835,13 @@ function RightPanel({
               <Tab value="brief">Brief {fe ? `· v${fe.version}` : ""}</Tab>
               {sandboxStarted && (
                 <Tab value="sandbox">
-                  {sandboxRunning ? "Sandbox details" : "Sandbox activity"}
+                  {sandboxRunning ? "Exploring" : "Exploration"}
                 </Tab>
               )}
               <Tab value="cases">
                 Test cases
                 {cases.length > 0 && (
-                  <span className="bg-muted text-ink-3 ml-1.5 rounded-sm px-1.5 py-px font-mono text-[10px]">
+                  <span className="bg-muted text-ink-3 ml-2 rounded-sm px-1.5 py-px font-mono text-2xs">{/* tab count chip: ml-2 = 8px, on-grid */}
                     {cases.length}
                   </span>
                 )}
@@ -865,7 +863,7 @@ function RightPanel({
                 <div className="text-ink-3 text-[13px]">
                   {showReviewBar
                     ? "Loading the brief…"
-                    : "The brief will appear here once Agent 1 finishes drafting it."}
+                    : "The brief will appear here once drafting is complete."}
                 </div>
               )}
             </div>
@@ -879,7 +877,7 @@ function RightPanel({
                 <div className="text-ink-3 text-[13px]">
                   {status === "completed" || status === "agent3_review"
                     ? "No test cases yet."
-                    : "Test cases will appear once Agent 3 generates them."}
+                    : "Test cases will appear here once the analysis is complete."}
                 </div>
               )}
             </div>
@@ -916,11 +914,11 @@ function RightPanel({
       </div>
 
       {showReviewBar && (
-        <div className="border-warn/40 bg-warn-soft/40 border-t px-6 py-3.5">
+        <div className="border-warn/40 bg-warn-soft/40 border-t px-6 py-4">
           <div className={cn(rail, "space-y-2")}>
             <div className="text-warn-ink flex items-center gap-1.5 text-[12px] font-medium">
               <AlertTriangleIcon className="size-[12px]" />
-              This run is paused. Review the {reviewKind === "brief" ? "brief" : "test cases"} above and approve or request changes.
+              Awaiting your review. Approve the {reviewKind === "brief" ? "brief" : "test cases"} to continue, or request changes below.
             </div>
             <Textarea
               placeholder="Tell the agent what to change (only required if you request changes)."
@@ -930,7 +928,7 @@ function RightPanel({
             />
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-ink-3 text-[11px]">
-                Approve to continue. Request changes loops the agent back.
+                Changes will be sent back for revision.
               </span>
               <div className="ml-auto flex flex-wrap gap-2">
                 <Button
@@ -970,7 +968,7 @@ function Tab({
   return (
     <TabsTrigger
       value={value}
-      className="text-ink-3 data-[state=active]:text-foreground data-[state=active]:border-foreground hover:text-foreground gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2.5 text-[12.5px] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+      className="text-ink-3 data-[state=active]:text-foreground data-[state=active]:border-foreground hover:text-foreground gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-3 text-sm transition-colors duration-150 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
     >
       {children}
     </TabsTrigger>
@@ -1819,7 +1817,7 @@ function DeadlineBar({ runId }: { runId: string }) {
           <span className="font-medium">
             {remaining > 0
               ? `Sandbox deadline in ${formatRemainingShort(remaining)}`
-              : "Sandbox deadline reached"}
+              : "Exploration timed out"}
           </span>
           {total > 0 && (
             <span className="text-ink-3 font-mono text-[11px]">

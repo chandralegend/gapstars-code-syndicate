@@ -84,22 +84,27 @@ export function Topbar() {
 
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
         {items.map((c, i) => {
+          const isLast = i === items.length - 1
           const content = (
             <span
               className={cn(
+                /* Parent crumbs: muted; current page: foreground + medium weight */
+                isLast
+                  ? "text-foreground font-medium"
+                  : "text-ink-3",
                 c.muted && "text-ink-3",
                 c.mono &&
-                  "text-foreground bg-muted rounded-sm px-1.5 py-0.5 font-mono text-xs",
+                  "font-mono text-xs bg-muted rounded-sm px-1.5 py-0.5",
               )}
             >
               {c.label}
             </span>
           )
           return (
-            <span key={i} className="flex items-center gap-2">
-              {i > 0 && <ChevronRightIcon aria-hidden className="text-ink-3 size-[13px]" />}
-              {c.href ? (
-                <Link href={c.href} className="hover:text-foreground transition-colors">
+            <span key={c.href ?? c.label ?? i} className="flex items-center gap-2">
+              {i > 0 && <ChevronRightIcon aria-hidden className="text-ink-3 size-[13px] shrink-0" />}
+              {c.href && !isLast ? (
+                <Link href={c.href} className="hover:text-foreground transition-colors duration-150">
                   {content}
                 </Link>
               ) : (
@@ -142,7 +147,7 @@ export function Topbar() {
                 new KeyboardEvent("keydown", { key: "k", metaKey: true }),
               )
             }}
-            className="border-border bg-card hover:bg-muted text-ink-2 hover:text-foreground inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="border-border bg-card hover:bg-muted hover:border-ink-4/50 text-ink-3 hover:text-foreground inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Open command palette"
           >
             <SearchIcon aria-hidden className="size-[13px]" />

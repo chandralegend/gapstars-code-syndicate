@@ -67,19 +67,17 @@ export default function ProjectsPage() {
             </div>
             <div className="mt-3 text-[16px] font-medium">
               No projects yet
-            </div>
-            <p className="text-ink-3 mt-1 max-w-[440px] text-[13px]">
-              A project owns the context for everything underneath it: feature
-              tests, runs, and the agents&apos; findings. Run onboarding to
-              seed the first one.
-            </p>
-            <Button
-              variant="accent"
-              className="mt-5"
-              onClick={() => router.push("/onboard")}
-            >
-              <PlusIcon className="size-[13px]" />
-              Create your first project
+             </div>
+             <p className="text-ink-3 mt-1 max-w-[440px] text-sm">
+               Projects group your feature tests and QA runs. Create one to get started.
+             </p>
+             <Button
+               variant="accent"
+               className="mt-6"
+               onClick={() => router.push("/onboard")}
+             >
+               <PlusIcon className="size-[13px]" />
+              New project
             </Button>
           </div>
         )}
@@ -87,7 +85,7 @@ export default function ProjectsPage() {
         {hasProjects && (
           <>
             <div className="mb-3">
-              <CapLine>your projects</CapLine>
+              <CapLine>projects</CapLine>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
