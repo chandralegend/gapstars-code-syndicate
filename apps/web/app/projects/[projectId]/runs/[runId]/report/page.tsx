@@ -133,210 +133,217 @@ export default function RunReportPage({ params }: PageProps) {
   }, [run, runId])
 
   return (
-    <PageContainer size="default" className="py-6 print:max-w-none print:py-0">
-      <PrintStyles />
-
-      {/* Action bar — hidden in print */}
-      <div className="text-ink-3 mb-6 flex items-center justify-between print:hidden">
-        <Link
-          href={`/projects/${projectId}/runs/${runId}`}
-          className="hover:text-foreground inline-flex items-center gap-1.5 text-[12.5px]"
-        >
-          <ArrowLeftIcon className="size-[13px]" />
-          Back to run
-        </Link>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.print()}
-            disabled={loading}
+    <PageContainer
+      size="default"
+      className="py-6 print:max-w-none print:py-0"
+    >
+      <div data-print-root>
+        {/* Action bar — hidden in print */}
+        <div className="text-ink-3 mb-6 flex items-center justify-between print:hidden">
+          <Link
+            href={`/projects/${projectId}/runs/${runId}`}
+            className="hover:text-foreground inline-flex items-center gap-1.5 text-[12.5px]"
           >
-            <PrinterIcon className="size-[13px]" />
-            Print
-          </Button>
-          <Button
-            variant="accent"
-            size="sm"
-            onClick={() => window.print()}
-            disabled={loading}
-          >
-            <DownloadIcon className="size-[13px]" />
-            Save as PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* Cover */}
-      <header className="border-border mb-8 border-b pb-6">
-        <div className="text-ink-3 font-mono text-[11px] uppercase tracking-[0.2em]">
-          QALoop run report
-        </div>
-        <h1 className="mt-2 text-[28px] leading-tight font-semibold tracking-[-0.02em]">
-          {scenario?.title ?? "Loading…"}
-        </h1>
-        <div className="text-ink-3 mt-1 text-[13.5px]">
-          {project?.name} · Run #{runId.slice(0, 8)} ·{" "}
-          {run ? runStatusLabel(run.status) : "—"}
-        </div>
-        {run && (
-          <div className="text-ink-4 mt-2 font-mono text-[11px]">
-            Generated {formatAbsolute(new Date().toISOString())} ·{" "}
-            Run started {formatAbsolute(run.created_at)}
+            <ArrowLeftIcon className="size-[13px]" />
+            Back to run
+          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.print()}
+              disabled={loading}
+            >
+              <PrinterIcon className="size-[13px]" />
+              Print
+            </Button>
+            <Button
+              variant="accent"
+              size="sm"
+              onClick={() => window.print()}
+              disabled={loading}
+            >
+              <DownloadIcon className="size-[13px]" />
+              Save as PDF
+            </Button>
           </div>
-        )}
-      </header>
+        </div>
 
-      {/* Project context */}
-      <Section title="Project context">
-        <DescriptionList
-          items={[
-            ["Name", project?.name ?? "—"],
-            ["Description", project?.description ?? "—"],
-            ["Tech stack", project?.tech_stack ?? "—"],
-            ["Target users", project?.target_users ?? "—"],
-          ]}
-        />
-      </Section>
-
-      {/* Brief */}
-      {fe && <BriefSection fe={fe} />}
-
-      {/* Sandbox findings + screenshots */}
-      <Section title="Sandbox exploration">
-        {findings ? (
-          <pre className="border-border bg-muted/40 text-foreground rounded-md border p-4 text-[12.5px] leading-relaxed whitespace-pre-wrap">
-            {findings}
-          </pre>
-        ) : (
-          <p className="text-ink-3 text-[13px]">
-            No findings.md was captured for this run.
-          </p>
-        )}
-        {screenshots.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-ink-3 mb-2 text-[11px] font-medium uppercase tracking-wide">
-              Screenshots ({screenshots.length})
-            </h3>
-            <div className="grid grid-cols-2 gap-3 print:grid-cols-1">
-              {screenshots.map((s, i) => (
-                <figure
-                  key={s.path}
-                  className="border-border bg-card overflow-hidden rounded-md border"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={sandboxFileUrl(runId, s.path)}
-                    alt={`Frame ${i + 1}`}
-                    className="block w-full"
-                    loading="lazy"
-                  />
-                  <figcaption className="text-ink-4 px-2 py-1 font-mono text-[10.5px]">
-                    Frame {i + 1} · {s.path.split("/").pop()}
-                  </figcaption>
-                </figure>
-              ))}
+        {/* Cover */}
+        <header className="border-border mb-8 border-b pb-6">
+          <div className="text-ink-3 font-mono text-[11px] uppercase tracking-[0.2em]">
+            QALoop run report
+          </div>
+          <h1 className="mt-2 text-[28px] leading-tight font-semibold tracking-[-0.02em]">
+            {scenario?.title ?? "Loading…"}
+          </h1>
+          <div className="text-ink-3 mt-1 text-[13.5px]">
+            {project?.name} · Run #{runId.slice(0, 8)} ·{" "}
+            {run ? runStatusLabel(run.status) : "—"}
+          </div>
+          {run && (
+            <div className="text-ink-4 mt-2 font-mono text-[11px]">
+              Generated {formatAbsolute(new Date().toISOString())} ·{" "}
+              Run started {formatAbsolute(run.created_at)}
             </div>
-          </div>
-        )}
-      </Section>
+          )}
+        </header>
 
-      {/* Test cases */}
-      <Section title={`Test cases (${cases.length})`}>
-        {cases.length === 0 ? (
-          <p className="text-ink-3 text-[13px]">No test cases were generated.</p>
-        ) : (
-          <ol className="space-y-3">
-            {cases.map((c, i) => (
-              <li
-                key={c.id}
-                className="border-border bg-card rounded-md border p-3"
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-ink-4 font-mono text-[11px]">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className="text-foreground text-[13.5px] font-medium">
-                      {c.title}
-                    </span>
-                  </div>
-                  <div className="text-ink-3 flex shrink-0 items-center gap-2 font-mono text-[10.5px]">
-                    <span className="bg-muted rounded px-1.5 py-px">
-                      {caseCategoryBadge(c.category)}
-                    </span>
-                    <span>{caseStatusLabel(c.status)}</span>
-                  </div>
-                </div>
-                {Array.isArray(c.steps) && c.steps.length > 0 && (
-                  <ol className="text-ink-2 ml-5 mt-2 list-decimal space-y-0.5 text-[12.5px]">
-                    {c.steps.map((s, j) => (
-                      <li key={j}>{renderStep(s)}</li>
-                    ))}
-                  </ol>
-                )}
-                {c.expected_result && (
-                  <p className="text-ink-3 mt-2 text-[12.5px]">
-                    <span className="text-ink-4">Expected:</span>{" "}
-                    {c.expected_result}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </Section>
-
-      {/* Bundle summary */}
-      {bundle && (
-        <Section title="Test scripts">
+        {/* Project context */}
+        <Section title="Project context">
           <DescriptionList
             items={[
-              ["Status", bundle.status],
-              ["Framework", bundle.framework ?? "—"],
-              ["Language", bundle.language ?? "—"],
-              ["Test count", String(bundle.test_count ?? "—")],
-              [
-                "Generated",
-                bundle.finished_at
-                  ? formatAbsolute(bundle.finished_at)
-                  : "—",
-              ],
+              ["Name", project?.name ?? "—"],
+              ["Description", project?.description ?? "—"],
+              ["Tech stack", project?.tech_stack ?? "—"],
+              ["Target users", project?.target_users ?? "—"],
             ]}
           />
         </Section>
-      )}
 
-      {/* Execution */}
-      {execution && (
-        <Section title="Test execution">
-          <DescriptionList
-            items={[
-              ["Status", execution.status],
-              [
-                "Duration",
-                execution.duration_ms != null
-                  ? formatDuration(execution.duration_ms)
-                  : "—",
-              ],
-              [
-                "Started",
-                execution.started_at
-                  ? formatAbsolute(execution.started_at)
-                  : "—",
-              ],
-            ]}
-          />
-          {execution.summary && (
-            <SummaryGrid summary={execution.summary as Record<string, unknown>} />
+        {/* Brief */}
+        {fe && <BriefSection fe={fe} />}
+
+        {/* Sandbox findings + screenshots */}
+        <Section title="Sandbox exploration">
+          {findings ? (
+            <pre className="border-border bg-muted/40 text-foreground rounded-md border p-4 text-[12.5px] leading-relaxed whitespace-pre-wrap">
+              {findings}
+            </pre>
+          ) : (
+            <p className="text-ink-3 text-[13px]">
+              No findings.md was captured for this run.
+            </p>
+          )}
+          {screenshots.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-ink-3 mb-2 text-[11px] font-medium uppercase tracking-wide">
+                Screenshots ({screenshots.length})
+              </h3>
+              <div className="grid grid-cols-2 gap-3 print:grid-cols-1">
+                {screenshots.map((s, i) => (
+                  <figure
+                    key={s.path}
+                    className="border-border bg-card overflow-hidden rounded-md border print:break-inside-avoid"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={sandboxFileUrl(runId, s.path)}
+                      alt={`Frame ${i + 1}`}
+                      className="block w-full"
+                      loading="lazy"
+                    />
+                    <figcaption className="text-ink-4 px-2 py-1 font-mono text-[10.5px]">
+                      Frame {i + 1} · {s.path.split("/").pop()}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
           )}
         </Section>
-      )}
 
-      {/* Footer */}
-      <footer className="border-border text-ink-4 mt-12 border-t pt-4 text-center font-mono text-[10.5px]">
-        QALoop · Generated from run #{runId.slice(0, 8)}
-      </footer>
+        {/* Test cases */}
+        <Section title={`Test cases (${cases.length})`}>
+          {cases.length === 0 ? (
+            <p className="text-ink-3 text-[13px]">
+              No test cases were generated.
+            </p>
+          ) : (
+            <ol className="space-y-3">
+              {cases.map((c, i) => (
+                <li
+                  key={c.id}
+                  className="border-border bg-card rounded-md border p-3 print:break-inside-avoid"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-ink-4 font-mono text-[11px]">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="text-foreground text-[13.5px] font-medium">
+                        {c.title}
+                      </span>
+                    </div>
+                    <div className="text-ink-3 flex shrink-0 items-center gap-2 font-mono text-[10.5px]">
+                      <span className="bg-muted rounded px-1.5 py-px">
+                        {caseCategoryBadge(c.category)}
+                      </span>
+                      <span>{caseStatusLabel(c.status)}</span>
+                    </div>
+                  </div>
+                  {Array.isArray(c.steps) && c.steps.length > 0 && (
+                    <ol className="text-ink-2 ml-5 mt-2 list-decimal space-y-0.5 text-[12.5px]">
+                      {c.steps.map((s, j) => (
+                        <li key={j}>{renderStep(s)}</li>
+                      ))}
+                    </ol>
+                  )}
+                  {c.expected_result && (
+                    <p className="text-ink-3 mt-2 text-[12.5px]">
+                      <span className="text-ink-4">Expected:</span>{" "}
+                      {c.expected_result}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </Section>
+
+        {/* Bundle summary */}
+        {bundle && (
+          <Section title="Test scripts">
+            <DescriptionList
+              items={[
+                ["Status", bundle.status],
+                ["Framework", bundle.framework ?? "—"],
+                ["Language", bundle.language ?? "—"],
+                ["Test count", String(bundle.test_count ?? "—")],
+                [
+                  "Generated",
+                  bundle.finished_at
+                    ? formatAbsolute(bundle.finished_at)
+                    : "—",
+                ],
+              ]}
+            />
+          </Section>
+        )}
+
+        {/* Execution */}
+        {execution && (
+          <Section title="Test execution">
+            <DescriptionList
+              items={[
+                ["Status", execution.status],
+                [
+                  "Duration",
+                  execution.duration_ms != null
+                    ? formatDuration(execution.duration_ms)
+                    : "—",
+                ],
+                [
+                  "Started",
+                  execution.started_at
+                    ? formatAbsolute(execution.started_at)
+                    : "—",
+                ],
+              ]}
+            />
+            {execution.summary && (
+              <SummaryGrid
+                summary={execution.summary as Record<string, unknown>}
+              />
+            )}
+          </Section>
+        )}
+
+        {/* Footer */}
+        <footer className="border-border text-ink-4 mt-12 border-t pt-4 text-center font-mono text-[10.5px]">
+          QALoop · Generated from run #{runId.slice(0, 8)}
+        </footer>
+      </div>
     </PageContainer>
   )
 }
@@ -351,8 +358,8 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section className="mb-8 break-inside-avoid">
-      <h2 className="text-ink-3 mb-3 border-b pb-1 font-mono text-[11px] uppercase tracking-[0.2em]">
+    <section className="mb-8 print:mb-6 print:break-inside-avoid-page">
+      <h2 className="text-ink-3 border-border mb-3 border-b pb-1 font-mono text-[11px] uppercase tracking-[0.2em] print:break-after-avoid">
         {title}
       </h2>
       {children}
@@ -511,47 +518,4 @@ function renderStep(s: unknown): string {
     }
   }
   return String(s)
-}
-
-/**
- * Print-only stylesheet.
- *
- * Hides the app shell (sidebar, topbar, navigation) and gives the
- * report comfortable margins so the printed PDF is just the report.
- */
-function PrintStyles() {
-  return (
-    <style jsx global>{`
-      @media print {
-        html,
-        body {
-          background: white !important;
-          color: black !important;
-        }
-        /* Hide everything in the AppShell except the report content. */
-        [data-sidebar],
-        [data-slot="sidebar"],
-        [data-slot="sidebar-trigger"],
-        nav,
-        header[role="banner"],
-        .group\\/sidebar,
-        aside[data-slot="sidebar-container"] {
-          display: none !important;
-        }
-        @page {
-          size: A4;
-          margin: 18mm 14mm;
-        }
-        a {
-          color: inherit !important;
-          text-decoration: none !important;
-        }
-        figure,
-        section,
-        li {
-          break-inside: avoid;
-        }
-      }
-    `}</style>
-  )
 }

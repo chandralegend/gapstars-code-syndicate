@@ -67,7 +67,10 @@ export function Topbar() {
   const runSlot = useBreadcrumbsStore((s) => s.runSlot)
 
   return (
-    <div className="border-border bg-background flex h-[52px] shrink-0 items-center gap-3 border-b px-4">
+    <div
+      data-slot="topbar"
+      className="border-border bg-background flex h-[52px] shrink-0 items-center gap-3 border-b px-4"
+    >
       <SidebarTrigger className="text-ink-3 hover:text-foreground -ml-1" />
 
       <div className="flex min-w-0 items-center gap-2 text-[13px]">

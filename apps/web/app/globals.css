@@ -249,3 +249,76 @@
 .probe-slide-in {
     animation: probe-slide-in 0.18s ease-out;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+ * PRINT — used by the run report's "Save as PDF" flow.
+ *
+ * Goal: when the user fires window.print() on /report, the printed
+ * PDF should contain only the report content, not the AppShell
+ * chrome (sidebar, topbar, sidebar gap, etc.).
+ *
+ * We target the well-known shadcn-sidebar data-slot attributes plus
+ * the topbar's data-slot. The report itself is wrapped in a
+ * [data-print-root] node so we can flatten it out of any flex/grid
+ * parents that would otherwise constrain its height.
+ * ───────────────────────────────────────────────────────────────── */
+@media print {
+    html,
+    body {
+        background: white !important;
+        color: black !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Hide every shell affordance. */
+    [data-slot="sidebar"],
+    [data-slot="sidebar-gap"],
+    [data-slot="sidebar-container"],
+    [data-slot="sidebar-trigger"],
+    [data-slot="sidebar-rail"],
+    [data-slot="topbar"] {
+        display: none !important;
+    }
+
+    /* The AppShell's main pane is a flex column with overflow:auto
+     * so its content can scroll inside a fixed viewport. For print
+     * we collapse all of that and let the document flow naturally. */
+    [data-slot="sidebar-inset"],
+    [data-slot="sidebar-wrapper"],
+    main,
+    .h-svh {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    /* Promote the report root above any positioned siblings. */
+    [data-print-root] {
+        position: static !important;
+        z-index: auto !important;
+        background: white !important;
+        color: black !important;
+    }
+
+    /* Native print page setup. */
+    @page {
+        size: A4;
+        margin: 18mm 14mm;
+    }
+
+    /* Avoid breaking inside dense blocks; let big sections break
+     * across pages naturally. */
+    figure,
+    pre,
+    li {
+        break-inside: avoid;
+    }
+
+    /* Strip link decoration for cleaner print output. */
+    a {
+        color: inherit !important;
+        text-decoration: none !important;
+    }
+}
