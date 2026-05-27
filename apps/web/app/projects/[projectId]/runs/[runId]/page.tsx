@@ -2,7 +2,6 @@
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
 import {
   AlertTriangleIcon,
   CheckIcon,
