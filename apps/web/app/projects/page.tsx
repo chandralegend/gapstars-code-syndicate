@@ -14,6 +14,7 @@ import { PageContainer } from "@/components/shell/page-container"
 import { Button } from "@/components/ui/button"
 import { listProjects, useFetch } from "@/lib/api"
 import { useSetBreadcrumbs } from "@/lib/stores/breadcrumbs"
+import { cn } from "@/lib/utils"
 
 export default function ProjectsPage() {
   useSetBreadcrumbs([{ label: "Projects" }], "none")
@@ -89,25 +90,44 @@ export default function ProjectsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {projects?.map((p) => (
+              {projects?.map((p, i) => (
                 <Link
                   key={p.id}
                   href={`/projects/${p.id}`}
-                  className="border-border bg-card hover:border-ink-4/60 focus-visible:ring-foreground/30 flex flex-col rounded-lg border p-5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className={cn(
+                    // Staggered entrance: each card slides in 40ms after the previous.
+                    // `probe-slide-in` + `probe-stagger-N` sets animation-delay.
+                    "probe-slide-in",
+                    i === 0 && "probe-stagger-1",
+                    i === 1 && "probe-stagger-2",
+                    i === 2 && "probe-stagger-3",
+                    i === 3 && "probe-stagger-4",
+                    i === 4 && "probe-stagger-5",
+                    i >= 5 && "probe-stagger-6",
+                    // Hover lift: the card rises 2px on hover with a subtle shadow
+                    // that communicates depth without breaking the flat aesthetic.
+                    "group border-border bg-card flex flex-col rounded-lg border p-5",
+                    "hover:-translate-y-0.5 hover:border-ink-4/50",
+                    "hover:shadow-[0_2px_8px_oklch(0.13_0.005_260/0.10)]",
+                    "transition-[colors,transform,box-shadow] duration-150",
+                    "focus-visible:ring-foreground/30 focus-visible:ring-2 focus-visible:outline-none",
+                  )}
                 >
                   <div className="text-[15px] font-medium">{p.name}</div>
-                  <p className="text-ink-3 mt-1 line-clamp-2 text-[12.5px] leading-relaxed">
+                  <p className="text-ink-3 mt-1 line-clamp-2 text-sm leading-relaxed">
                     {p.description}
                   </p>
-                  <div className="text-ink-4 mt-4 flex items-center gap-3 text-[11.5px]">
+                  <div className="text-ink-3 mt-4 flex items-center gap-3 text-xs">
                     <span className="flex items-center gap-1">
-                      <FlaskConicalIcon className="size-[11px]" />
-                      Open feature tests
+                      <FlaskConicalIcon aria-hidden className="size-[11px]" />
+                      Feature tests
                     </span>
-                    <span className="ml-auto inline-flex items-center gap-0.5">
-                      open
-                      <ChevronRightIcon className="size-[12px]" />
-                    </span>
+                    {/* Arrow translates right on group hover — spatial feedback
+                     *  that signals this card is interactive. */}
+                    <ChevronRightIcon
+                      aria-hidden
+                      className="ml-auto size-[13px] transition-transform duration-150 group-hover:translate-x-0.5"
+                    />
                   </div>
                 </Link>
               ))}

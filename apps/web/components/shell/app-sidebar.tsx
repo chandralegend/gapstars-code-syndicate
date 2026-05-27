@@ -201,7 +201,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {project && (
-          <SidebarGroup>
+          <SidebarGroup className="probe-slide-in">
             <SidebarGroupLabel className="text-2xs text-sidebar-foreground/50 px-3 pt-2 pb-1 tracking-[0.12em] uppercase group-data-[state=collapsed]:hidden">
               project
             </SidebarGroupLabel>

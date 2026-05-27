@@ -45,10 +45,16 @@ function RunBadge({ status }: { status?: string }) {
       ? "Awaiting you"
       : runStatusLabel(status)
   return (
-    /* aria-live so status transitions ("Live" → "Awaiting you" → "Completed")
-     * are announced to screen readers without requiring focus. */
+    /* aria-live so status transitions are announced to screen readers. */
     <div aria-live="polite" aria-atomic="true">
-      <Badge variant={variant} className="gap-1.5">
+      {/* key={variant} causes React to replace the badge when the variant
+       *  changes. probe-slide-in makes the new badge slide in from below,
+       *  giving the status transition a spatial, confident feel. */}
+      <Badge
+        key={variant}
+        variant={variant}
+        className="gap-1.5 probe-slide-in transition-[background-color,color,border-color] duration-300"
+      >
         <span
           aria-hidden
           className={cn(
@@ -116,45 +122,51 @@ export function Topbar() {
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
-        {rightSlot === "run" && (
-          <>
-            <RunBadge status={runSlot.runStatus} />
-            {runSlot.exportReportHref && (
-              <Link
-                href={runSlot.exportReportHref}
-                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-              >
-                <FileTextIcon aria-hidden className="size-[13px]" />
-                Export report
-              </Link>
-            )}
-            {runSlot.openTestHref && (
-              <Link
-                href={runSlot.openTestHref}
-                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-              >
-                <ExternalLinkIcon aria-hidden className="size-[13px]" />
-                Open feature test
-              </Link>
-            )}
-          </>
-        )}
-        {rightSlot === "default" && (
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "k", metaKey: true }),
-              )
-            }}
-            className="border-border bg-card hover:bg-muted hover:border-ink-4/50 text-ink-3 hover:text-foreground inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Open command palette"
-          >
-            <SearchIcon aria-hidden className="size-[13px]" />
-            <span>Search</span>
-            <Kbd>⌘K</Kbd>
-          </button>
-        )}
+        {/* key={rightSlot} causes a remount + probe-fade-in when the slot
+         *  switches between 'default' (search button) and 'run' (run badge
+         *  + action links). This makes route changes feel intentional rather
+         *  than abrupt. */}
+        <div key={rightSlot} className="probe-fade-in flex items-center gap-2">
+          {rightSlot === "run" && (
+            <>
+              <RunBadge status={runSlot.runStatus} />
+              {runSlot.exportReportHref && (
+                <Link
+                  href={runSlot.exportReportHref}
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                >
+                  <FileTextIcon aria-hidden className="size-[13px]" />
+                  Export report
+                </Link>
+              )}
+              {runSlot.openTestHref && (
+                <Link
+                  href={runSlot.openTestHref}
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                >
+                  <ExternalLinkIcon aria-hidden className="size-[13px]" />
+                  Open feature test
+                </Link>
+              )}
+            </>
+          )}
+          {rightSlot === "default" && (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+                )
+              }}
+              className="border-border bg-card hover:bg-muted hover:border-ink-4/50 text-ink-3 hover:text-foreground inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Open command palette"
+            >
+              <SearchIcon aria-hidden className="size-[13px]" />
+              <span>Search</span>
+              <Kbd>⌘K</Kbd>
+            </button>
+          )}
+        </div>
         <ThemeToggle />
       </div>
     </div>

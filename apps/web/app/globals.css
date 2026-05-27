@@ -295,8 +295,110 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── New animation primitives ─────────────────────────────────────
+ *
+ * Easing: ease-out-quart for all enter motions (confident deceleration).
+ * ease-in for exits (fast acceleration, gets out of the way).
+ *
+ * No bounce. No elastic. Motion that draws attention to itself
+ * is motion that failed.
+ * ──────────────────────────────────────────────────────────────── */
+
+/* Exit: paired with probe-slide-in for symmetric enter/leave. */
+@keyframes probe-slide-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Simple in-place fade, no displacement. For content crossfades. */
+@keyframes probe-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes probe-fade-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+/* Slide up from bottom — ReviewBar's primary entrance. */
+@keyframes probe-slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Height expand via grid trick. Wrap the content in a div with
+ * `min-h-0 overflow-hidden` and apply this to the outer wrapper. */
+@keyframes probe-expand {
+    from { grid-template-rows: 0fr; }
+    to   { grid-template-rows: 1fr; }
+}
+
+@keyframes probe-collapse {
+    from { grid-template-rows: 1fr; }
+    to   { grid-template-rows: 0fr; }
+}
+
+/* ── Utility classes ─────────────────────────────────────────────
+ *
+ * Duration tokens:
+ *   --probe-fast:   120ms  instant feedback (button press, toggle)
+ *   --probe-normal: 180ms  standard enter/exit (default probe-slide-in)
+ *   --probe-slow:   280ms  heavier surfaces (ReviewBar, page sections)
+ *   --probe-xslow:  400ms  phase-level state transitions (PhaseStepper)
+ * ──────────────────────────────────────────────────────────────── */
+:root {
+    --probe-fast:   120ms;
+    --probe-normal: 180ms;
+    --probe-slow:   280ms;
+    --probe-xslow:  400ms;
+    /* ease-out-quart: confident, decelerating. Never linear, never bounce. */
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-in-quart:  cubic-bezier(0.5, 0, 0.75, 0);
+}
+
 .probe-slide-in {
-    animation: probe-slide-in 0.18s ease-out;
+    animation: probe-slide-in var(--probe-normal) var(--ease-out-quart) both;
+}
+
+.probe-slide-out {
+    animation: probe-slide-out calc(var(--probe-normal) * 0.75) var(--ease-in-quart) both;
+}
+
+.probe-slide-up {
+    animation: probe-slide-up var(--probe-slow) var(--ease-out-quart) both;
+}
+
+.probe-fade-in {
+    animation: probe-fade-in var(--probe-normal) ease-out both;
+}
+
+.probe-fade-out {
+    animation: probe-fade-out calc(var(--probe-normal) * 0.75) ease-in both;
+}
+
+.probe-caret {
+    animation: probe-caret 1s ease-in-out infinite;
+}
+
+/* Stagger helpers — add to grid/list items, use CSS var to offset. */
+.probe-stagger-1 { animation-delay: 40ms; }
+.probe-stagger-2 { animation-delay: 80ms; }
+.probe-stagger-3 { animation-delay: 120ms; }
+.probe-stagger-4 { animation-delay: 160ms; }
+.probe-stagger-5 { animation-delay: 200ms; }
+.probe-stagger-6 { animation-delay: 240ms; }
+
+/* Height-expand wrapper. The collapsible content inside must have
+ * `min-h-0 overflow-hidden`. */
+.probe-expand-enter {
+    display: grid;
+    animation: probe-expand var(--probe-normal) var(--ease-out-quart) both;
+}
+
+.probe-expand-exit {
+    display: grid;
+    animation: probe-collapse calc(var(--probe-normal) * 0.75) var(--ease-in-quart) both;
 }
 
 /* ─────────────────────────────────────────────────────────────────

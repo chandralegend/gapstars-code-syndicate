@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -39,6 +40,7 @@ import {
   caseStatusLabel,
   eventLabel,
   eventSummary,
+  isActiveRun,
   nodeLabel,
   nodeOrderIndex,
   nodePhase,
@@ -390,8 +392,8 @@ function PhaseStepper({ status }: { status: string }) {
           s.state === "done"
             ? "bg-ok"
             : s.state === "active"
-              ? "bg-accent"
-              : "bg-ink-4/40"
+              ? "bg-foreground/70"
+              : "bg-ink-4/30"
         const labelClass =
           s.state === "active"
             ? "text-foreground font-medium"
@@ -402,11 +404,32 @@ function PhaseStepper({ status }: { status: string }) {
           <li key={s.key} className="flex items-center gap-1.5">
             <span
               aria-hidden
-              className={cn("h-1.5 w-1.5 rounded-full", dotClass)}
+              className={cn(
+                "rounded-full transition-[background-color,transform] duration-[400ms]",
+                // Active dot is slightly larger — the extra scale makes the
+                // current phase unmistakable in a line of identically-sized dots.
+                s.state === "active"
+                  ? "h-2 w-2 scale-125"
+                  : "h-1.5 w-1.5 scale-100",
+                dotClass,
+              )}
             />
-            <span className={cn("text-[11.5px]", labelClass)}>{s.label}</span>
+            <span
+              className={cn(
+                "text-2xs transition-[color,font-weight] duration-300",
+                labelClass,
+              )}
+            >
+              {s.label}
+            </span>
             {i < steps.length - 1 && (
-              <span aria-hidden className="bg-ink-4/30 h-px w-3" />
+              <span
+                aria-hidden
+                className={cn(
+                  "h-px w-3 transition-colors duration-[400ms]",
+                  s.state === "done" ? "bg-ok/40" : "bg-ink-4/30",
+                )}
+              />
             )}
             {s.state === "active" && (
               <span className="sr-only">(current)</span>
@@ -600,10 +623,6 @@ function NodeCard({
 }) {
   const [open, setOpen] = useState(false)
   const status = bucketStatus(bucket, runStatus)
-  // Drop noisy / superseded events. The bucket header already shows
-  // the outcome of the phase, so we don't need every transitional
-  // breadcrumb. shouldShowEvent walks the *future* of the bucket so
-  // it can hide an early progress event when a later one exists.
   const visibleEvents = useMemo(() => {
     const out: SseEvent[] = []
     for (let i = 0; i < bucket.events.length; i += 1) {
@@ -615,15 +634,23 @@ function NodeCard({
     return out
   }, [bucket.events])
   const eventCount = visibleEvents.length
+  const isRunning = status.tone === "accent"
   return (
     <div
       role="status"
       aria-label={`${nodeLabel(bucket.node_name)}: ${status.label}`}
       className={cn(
+        // Base: smooth tone transitions. The card's border + bg animate
+        // when the run phase advances so status changes feel live, not
+        // like a page reload.
         "rounded-lg border px-3 py-3",
-        status.tone === "err" && "border-err/40 bg-err-soft/30",
-        status.tone === "warn" && "border-warn/40 bg-warn-soft/30",
-        status.tone === "accent" && "border-accent/40 bg-accent-soft/30",
+        "transition-[border-color,background-color] duration-[400ms]",
+        status.tone === "err" && "border-err/50 bg-err-soft/25",
+        status.tone === "warn" && "border-warn/40 bg-warn-soft/25",
+        // Running: elevated presence — stronger border, very faint tint.
+        // This is the "active" card; it should read as the loudest item
+        // in the timeline without being garish.
+        isRunning && "border-foreground/20 bg-card shadow-[0_0_0_1px_oklch(0.13_0.005_260/0.06)]",
         status.tone === "ok" && "border-ok/30 bg-card",
         status.tone === "muted" && "border-border bg-card",
       )}
@@ -635,7 +662,7 @@ function NodeCard({
         </div>
         <Badge
           variant={status.tone === "muted" ? "muted" : status.tone}
-          className="ml-auto"
+          className="ml-auto transition-[background-color,color,border-color] duration-300"
         >
           {status.label}
         </Badge>
@@ -657,30 +684,42 @@ function NodeCard({
         >
           <ChevronRightIcon
             aria-hidden
-            className={cn("size-[11px] transition-transform duration-150 motion-safe:transition-transform", open && "rotate-90")}
+            className={cn(
+              "size-[11px] motion-safe:transition-transform motion-safe:duration-150",
+              open && "rotate-90",
+            )}
           />
           {eventCount} event{eventCount === 1 ? "" : "s"}
         </button>
       </div>
 
-      {open && (
-        <div
-          id={`node-events-${bucket.node_name}`}
-          className="border-border divide-border -mx-3 mt-2 divide-y border-t"
-        >
-          {visibleEvents.length === 0 ? (
-            <div className="text-ink-3 px-3 py-2 text-xs">
-              No events to show beyond the summary above.
-            </div>
-          ) : (
-            visibleEvents.map((e) => (
-              <div key={e.id} className="px-3 py-2">
-                <EventLine e={e} />
+      {/* Height-expand using the CSS grid trick:
+       *  outer wrapper animates `grid-template-rows: 0fr → 1fr`;
+       *  inner wrapper has `min-h-0 overflow-hidden` to clip at 0. */}
+      <div
+        id={`node-events-${bucket.node_name}`}
+        className={cn(
+          "grid motion-safe:transition-[grid-template-rows] motion-safe:duration-200",
+          open ? "motion-safe:[grid-template-rows:1fr] probe-expand-enter" : "grid-rows-[0fr]",
+        )}
+        aria-hidden={!open}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-border divide-border -mx-3 mt-2 divide-y border-t">
+            {visibleEvents.length === 0 ? (
+              <div className="text-ink-3 px-3 py-2 text-xs">
+                No events to show beyond the summary above.
               </div>
-            ))
-          )}
+            ) : (
+              visibleEvents.map((e) => (
+                <div key={e.id} className="px-3 py-2">
+                  <EventLine e={e} />
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -801,7 +840,21 @@ function RightPanel({
       <div className="border-border border-b px-6 py-4">
         <div className={cn(rail, "flex flex-wrap items-center gap-x-3 gap-y-2")}>
           <div className="min-w-0">
-            <div className="text-[15px] font-semibold">{runPhaseTitle(status)}</div>
+            <div className="text-[15px] font-semibold">
+              {runPhaseTitle(status)}
+              {/* Blinking caret while any agent is actively producing output.
+               *  Uses probe-caret (defined in globals.css): opacity 0.4→1 loop.
+               *  The span has `ml-0.5` and `inline-block` so it sits naturally
+               *  after the last glyph without affecting line height. */}
+              {isActiveRun(status) && (
+                <span
+                  aria-hidden
+                  className="ml-0.5 inline-block probe-caret text-foreground/50"
+                >
+                  ▋
+                </span>
+              )}
+            </div>
             <div className="text-ink-3 text-[12px]">
               {run?.current_node
                 ? nodeLabel(run.current_node)
@@ -914,8 +967,24 @@ function RightPanel({
       </div>
 
       {showReviewBar && (
-        <div className="border-warn/40 bg-warn-soft/40 border-t px-6 py-4">
-          <div className={cn(rail, "space-y-2")}>
+        <div className="border-warn/40 bg-warn-soft/40 border-t px-6 py-4 probe-slide-up relative">
+          {/* Lamp swing */}
+          <div
+            aria-hidden
+            className="foundry-lamp-swing pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2"
+          >
+            <div className="border-foundry-amber/60 from-foundry-amber/30 to-foundry-amber/0 h-3 w-24 rounded-b-full border-x border-b bg-gradient-to-b" />
+          </div>
+          {/* Amber glow */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 -top-12 mx-auto h-12 w-[60%] opacity-60"
+            style={{
+              background:
+                "radial-gradient(ellipse at center top, oklch(0.80 0.17 75 / 0.55), transparent 70%)",
+            }}
+          />
+          <div className={cn(rail, "relative space-y-2")}>
             <div className="text-warn-ink flex items-center gap-1.5 text-[12px] font-medium">
               <AlertTriangleIcon className="size-[12px]" />
               Awaiting your review. Approve the {reviewKind === "brief" ? "brief" : "test cases"} to continue, or request changes below.
@@ -968,7 +1037,16 @@ function Tab({
   return (
     <TabsTrigger
       value={value}
-      className="text-ink-3 data-[state=active]:text-foreground data-[state=active]:border-foreground hover:text-foreground gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-3 text-sm transition-colors duration-150 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+      className={cn(
+        "relative text-ink-3 data-[state=active]:text-foreground hover:text-foreground",
+        "gap-1.5 rounded-none bg-transparent px-3 py-3 text-sm",
+        "border-b-2 border-transparent",
+        // The border-color transition makes the underline fade in/out
+        // when switching tabs instead of snapping. Not a sliding indicator,
+        // but it correctly uses only CSS transitions (no JS measurement).
+        "transition-[color,border-color] duration-200",
+        "data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+      )}
     >
       {children}
     </TabsTrigger>
