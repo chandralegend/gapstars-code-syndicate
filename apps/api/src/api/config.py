@@ -47,8 +47,21 @@ class Settings(BaseSettings):
     sandbox_enabled: bool = True
     sandbox_default_timeout_seconds: int = 360
     sandbox_poll_interval_seconds: float = 3.0
-    sandbox_default_model: str = "claude-sonnet-4-5-20250929"
+    # Default model for ANY sandbox task. Haiku 4.5 is ~3-5x faster than
+    # Sonnet 4.5 on Computer Use tasks for noticeably less cost. Both
+    # Agent 2 (recon) and Agent 4 (script bundle) use it; Agent 4
+    # benefits from the speed when writing 25 test functions across
+    # multiple files.
+    sandbox_default_model: str = "claude-haiku-4-5-20251007"
     sandbox_max_iterations: int = 12
+
+    # ── Agent 2 specifically (overrides the defaults above) ───────────────────
+    # Kept as a separate knob in case you want to tune Agent 2 without
+    # touching Agent 4.
+    sandbox_agent2_model: str = "claude-haiku-4-5-20251007"
+    sandbox_agent2_max_tokens: int = 2048
+    sandbox_agent2_recent_images: int = 2
+    sandbox_agent2_max_iterations: int = 15
 
     @property
     def cors_origins_list(self) -> list[str]:

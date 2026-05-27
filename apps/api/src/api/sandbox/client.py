@@ -69,6 +69,9 @@ class SandboxClient:
         system_prompt_suffix: str = "",
         timeout_seconds: int = 1800,
         max_iterations: int = 50,
+        max_tokens: int | None = None,
+        only_n_most_recent_images: int | None = None,
+        token_efficient_tools_beta: bool = False,
         env: dict[str, str] | None = None,
         kind: str = "exploration",
         source_task_id: str | None = None,
@@ -83,6 +86,11 @@ class SandboxClient:
         ``execution`` requires ``source_task_id`` to point at the task whose
         ``output/workspace/`` holds the bundle to run; sandbox-svc copies
         that bundle into the new task's ``input/bundle/`` before queueing.
+
+        ``max_tokens`` and ``only_n_most_recent_images`` let callers tune
+        per-task latency: lower values produce faster but shorter / less
+        contextually-aware turns. ``token_efficient_tools_beta`` opts into
+        the Anthropic beta header that returns shorter tool messages.
         """
         spec: dict[str, Any] = {
             "prompt": prompt,
@@ -96,6 +104,12 @@ class SandboxClient:
             spec["model"] = model
         if source_task_id is not None:
             spec["source_task_id"] = source_task_id
+        if max_tokens is not None:
+            spec["max_tokens"] = max_tokens
+        if only_n_most_recent_images is not None:
+            spec["only_n_most_recent_images"] = only_n_most_recent_images
+        if token_efficient_tools_beta:
+            spec["token_efficient_tools_beta"] = True
 
         # `data` is the JSON-encoded TaskCreate body, sent as a form field.
         response = await self._client.post(

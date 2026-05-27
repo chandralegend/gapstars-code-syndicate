@@ -4,6 +4,7 @@ import Link from "next/link"
 import {
   ChevronRightIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   SearchIcon,
 } from "lucide-react"
 
@@ -101,6 +102,15 @@ export function Topbar() {
         {rightSlot === "run" && (
           <>
             <RunBadge status={runSlot.runStatus} />
+            {runSlot.exportReportHref && (
+              <Link
+                href={runSlot.exportReportHref}
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+              >
+                <FileTextIcon className="size-[13px]" />
+                Export report
+              </Link>
+            )}
             {runSlot.openTestHref && (
               <Link
                 href={runSlot.openTestHref}

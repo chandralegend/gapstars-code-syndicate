@@ -16,8 +16,28 @@ const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
+/**
+ * Parse an ISO-ish timestamp into ms-since-epoch. The API serializes
+ * timezone-naive UTC datetimes (e.g. "2026-05-25T12:34:56" or
+ * "2026-05-25T12:34:56.789012") with no Z suffix, which `Date.parse`
+ * interprets as *local time* — that's how a fresh run can look 5-6h
+ * old to a user in a +0530 timezone.
+ *
+ * If the input has no explicit timezone marker, we treat it as UTC.
+ */
+export function parseTs(input: string | Date | number): number {
+  if (typeof input !== "string") return new Date(input).getTime()
+  const trimmed = input.trim()
+  // Already has a TZ marker (Z, +hh:mm, or -hh:mm at the end).
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(trimmed)) return Date.parse(trimmed)
+  // Looks like a date-only string ("2026-05-25") — let Date handle it.
+  if (!/T\d/.test(trimmed)) return Date.parse(trimmed)
+  // Naive datetime — treat as UTC.
+  return Date.parse(trimmed + "Z")
+}
+
 export function formatRelative(input: string | Date | number): string {
-  const ts = typeof input === "string" ? Date.parse(input) : new Date(input).getTime()
+  const ts = parseTs(input)
   if (!Number.isFinite(ts)) return ""
   const diff = Date.now() - ts
   const abs = Math.abs(diff)
@@ -38,9 +58,9 @@ export function formatRelative(input: string | Date | number): string {
 }
 
 export function formatAbsolute(input: string | Date | number): string {
-  const d = typeof input === "string" ? new Date(input) : new Date(input)
-  if (Number.isNaN(d.getTime())) return ""
-  return d.toLocaleString(undefined, {
+  const ts = parseTs(input)
+  if (!Number.isFinite(ts)) return ""
+  return new Date(ts).toLocaleString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",

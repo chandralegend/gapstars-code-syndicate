@@ -96,6 +96,9 @@ class TaskCreate(BaseModel):
     tool_version: str = Field(default="computer_use_20250124")
     only_n_most_recent_images: int | None = Field(default=3, ge=0)
     thinking_budget: int | None = None
+    # Anthropic beta header that returns shorter tool messages.
+    # Pairs well with Haiku for fast Computer Use.
+    token_efficient_tools_beta: bool = False
     timeout_seconds: int = Field(default=1800, ge=30, le=24 * 3600)
     env: dict[str, str] = Field(default_factory=dict)
     provider: str = Field(default="anthropic")

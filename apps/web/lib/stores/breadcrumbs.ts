@@ -8,6 +8,9 @@ import type { BreadcrumbItem } from "@/lib/types"
 export interface RunSlotData {
   /** Where the topbar's "Open feature test" link should point. */
   openTestHref?: string
+  /** Where the topbar's "Export report" link should point.
+   *  Only set on the run-detail page. */
+  exportReportHref?: string
   /** Latest run status, used by the topbar to tune the Live badge. */
   runStatus?: string
 }

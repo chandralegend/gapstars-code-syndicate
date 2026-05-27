@@ -196,6 +196,7 @@ export default function ProjectRunDetailPage({
       openTestHref: scenario
         ? `/projects/${projectId}/testsets/${scenario.id}`
         : undefined,
+      exportReportHref: `/projects/${projectId}/runs/${runId}/report`,
       runStatus: run?.status,
     },
   )
@@ -428,6 +429,8 @@ interface NodeBucket {
   endedAt?: string
   /** For sandbox bucket, the latest progress status */
   sandboxStatus?: string
+  /** For review buckets, what the user decided. */
+  feedbackDecision?: "approve" | "request_changes"
 }
 
 function bucketEvents(events: SseEvent[]): NodeBucket[] {
@@ -449,8 +452,21 @@ function bucketEvents(events: SseEvent[]): NodeBucket[] {
     bucket.events.push(e)
     if (e.type === "node_start") bucket.startedAt = e.created_at
     if (e.type === "node_end") bucket.endedAt = e.created_at
-    if (e.type === "interrupt") bucket.isInterrupt = true
-    if (e.type === "feedback_received") bucket.isInterrupt = false
+    if (e.type === "interrupt") {
+      bucket.isInterrupt = true
+      // Review buckets never emit node_start/node_end; the interrupt
+      // marks when the review started.
+      if (!bucket.startedAt) bucket.startedAt = e.created_at
+    }
+    if (e.type === "feedback_received") {
+      bucket.isInterrupt = false
+      // Likewise, feedback_received marks when the review concluded.
+      if (!bucket.endedAt) bucket.endedAt = e.created_at
+      const p = e.payload as Record<string, unknown> | null | undefined
+      const dec = String(p?.decision ?? "")
+      bucket.feedbackDecision =
+        dec === "approve" ? "approve" : "request_changes"
+    }
     if (e.type === "error" || e.type === "sandbox_task_failed")
       bucket.isError = true
     if (e.type === "sandbox_task_progress") {
@@ -482,6 +498,13 @@ function bucketStatus(
   }
   if (bucket.isInterrupt && !TERMINAL_STATUSES.has(runStatus ?? "")) {
     return { label: "Awaiting your review", tone: "warn", dot: "wait" }
+  }
+  // Review buckets: feedback_received decides whether it was approved
+  // or sent back for changes. Show that decision in the label.
+  if (bucket.feedbackDecision) {
+    return bucket.feedbackDecision === "approve"
+      ? { label: "Approved", tone: "ok", dot: "done" }
+      : { label: "Changes requested", tone: "warn", dot: "wait" }
   }
   if (bucket.endedAt) {
     let label = "Done"
@@ -639,13 +662,17 @@ function NodeCard({
       </div>
 
       {open && (
-        <div className="border-border mt-2 space-y-2 border-t pt-2">
+        <div className="border-border divide-border -mx-3 mt-2 divide-y border-t">
           {visibleEvents.length === 0 ? (
-            <div className="text-ink-4 text-[11.5px]">
+            <div className="text-ink-4 px-3 py-2 text-[11.5px]">
               No events to show beyond the summary above.
             </div>
           ) : (
-            visibleEvents.map((e) => <EventLine key={e.id} e={e} />)
+            visibleEvents.map((e) => (
+              <div key={e.id} className="px-3 py-2">
+                <EventLine e={e} />
+              </div>
+            ))
           )}
         </div>
       )}
@@ -731,6 +758,24 @@ function RightPanel({
     status === "agent3_review" ? "cases" : "brief"
   const sandboxRunning = status === "agent2_running"
 
+  // Track the script bundle so we can hide the Test results tab while
+  // the Script Builder is still working. Polls every 3s while pending
+  // or running. Returns null when no bundle exists yet (404).
+  const bundleQ = useFetch(
+    useCallback(() => getLatestScriptBundle(runId), [runId]),
+    [runId],
+  )
+  const bundleStatus = bundleQ.data?.status
+  const bundleInFlight =
+    bundleStatus === "pending" || bundleStatus === "running"
+  const bundleReady = bundleStatus === "succeeded"
+  useEffect(() => {
+    if (!bundleInFlight) return
+    const t = setInterval(() => void bundleQ.mutate(), 3000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bundleInFlight])
+
   // Default tab follows the run's phase, so the user always lands on
   // the most useful surface for the current state of the world.
   const defaultTab =
@@ -764,15 +809,18 @@ function RightPanel({
         </div>
       </div>
 
-      {sandboxRunning && (
-        <div className="border-border border-b bg-muted/30 px-6 py-4">
-          <div className={rail}>
-            <LiveScreenView runId={runId} runStatus={status} />
-          </div>
-        </div>
-      )}
-
+      {/* Single scrollable region: live view (when sandboxRunning) is
+       *  scrolled together with the tabs below it so users can always
+       *  reach the activity log and tab content even when the iframe
+       *  is tall. */}
       <div className="min-h-0 flex-1 overflow-auto">
+        {sandboxRunning && (
+          <div className="border-border border-b bg-muted/30 px-6 py-4">
+            <div className={rail}>
+              <LiveScreenView runId={runId} runStatus={status} />
+            </div>
+          </div>
+        )}
         <Tabs
           defaultValue={defaultTab}
           className="flex min-h-0 flex-1 flex-col"
@@ -780,6 +828,11 @@ function RightPanel({
           <TabsList className="border-border h-auto justify-start gap-1 rounded-none border-b bg-transparent px-6 py-0">
             <div className={cn(rail, "flex items-center gap-1")}>
               <Tab value="brief">Brief {fe ? `· v${fe.version}` : ""}</Tab>
+              {sandboxStarted && (
+                <Tab value="sandbox">
+                  {sandboxRunning ? "Sandbox details" : "Sandbox activity"}
+                </Tab>
+              )}
               <Tab value="cases">
                 Test cases
                 {cases.length > 0 && (
@@ -788,15 +841,10 @@ function RightPanel({
                   </span>
                 )}
               </Tab>
-              {sandboxStarted && (
-                <Tab value="sandbox">
-                  {sandboxRunning ? "Sandbox details" : "Sandbox activity"}
-                </Tab>
-              )}
               {status === "completed" && (
                 <Tab value="scripts">Test scripts</Tab>
               )}
-              {status === "completed" && (
+              {status === "completed" && bundleReady && (
                 <Tab value="results">Test results</Tab>
               )}
             </div>
@@ -850,7 +898,7 @@ function RightPanel({
             </TabsContent>
           )}
 
-          {status === "completed" && (
+          {status === "completed" && bundleReady && (
             <TabsContent value="results" className="px-6 py-5">
               <div className={rail}>
                 <TestResultsPanel runId={runId} />
@@ -1485,12 +1533,60 @@ function LiveScreenView({
   // wants to follow the latest. Default: follow.
   const [pinned, setPinned] = useState<string | null>(null)
 
-  // When new screenshots arrive while we're in "follow" mode, the
-  // displayed image automatically rolls forward to the newest.
-  const displayedPath = pinned ?? latestPath
+  // Replay player: when the user hits Play we advance through frames
+  // every PLAY_INTERVAL_MS so it reads as a flipbook. Pauses when the
+  // user scrubs/clicks a thumbnail. Auto-restarts at the start when
+  // the playhead reaches the end.
+  const [playing, setPlaying] = useState(false)
+  const [playSpeed, setPlaySpeed] = useState(1) //  1x, 2x, 4x
+  const PLAY_INTERVAL_MS = 750 //  ~1.3 fps at 1x
+
+  // While playing, derive the "displayed" screenshot from the playhead
+  // index. While not playing, fall back to pinned -> latest.
+  const [playIdx, setPlayIdx] = useState(0)
+  useEffect(() => {
+    if (!playing || screenshots.length === 0) return
+    const t = setInterval(() => {
+      setPlayIdx((i) => {
+        const next = i + 1
+        if (next >= screenshots.length) {
+          // Loop back to the start so the demo plays continuously.
+          return 0
+        }
+        return next
+      })
+    }, PLAY_INTERVAL_MS / playSpeed)
+    return () => clearInterval(t)
+  }, [playing, playSpeed, screenshots.length])
+
+  // When playing starts and the user is following latest, snap to the
+  // beginning so they see the full sequence.
+  const startPlay = () => {
+    setPlayIdx(0)
+    setPinned(null)
+    setPlaying(true)
+  }
+  const stopPlay = () => setPlaying(false)
+
+  // When the user scrubs / clicks a thumbnail mid-playback, pause.
+  const scrubTo = (idx: number) => {
+    setPlaying(false)
+    if (idx >= 0 && idx < screenshots.length) {
+      setPlayIdx(idx)
+      setPinned(screenshots[idx]!.path)
+    }
+  }
+
+  // Resolve which frame to show. Player wins; otherwise pinned/latest.
+  const displayedPath = playing
+    ? (screenshots[playIdx]?.path ?? latestPath)
+    : (pinned ?? latestPath)
   const displayed = screenshots.find((s) => s.path === displayedPath) ??
     screenshots[screenshots.length - 1] ??
     null
+  const displayedIdx = displayed
+    ? screenshots.findIndex((s) => s.path === displayed.path)
+    : -1
 
   if (screenshotsQ.error) {
     return (
@@ -1522,19 +1618,56 @@ function LiveScreenView({
               <span className="bg-warn size-2.5 rounded-full opacity-60" />
               <span className="bg-ok size-2.5 rounded-full opacity-60" />
             </div>
-            <span className="text-ink-3 ml-2 font-mono text-[11px]">
+            <span className="text-ink-3 ml-2 truncate font-mono text-[11px]">
               {displayed?.path.split("/").pop()}
             </span>
-            {isLive && (
+            {isLive && !playing && (
               <Badge variant="accent" className="ml-2 gap-1.5">
                 <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
                 {pinned ? "paused" : "live"}
               </Badge>
             )}
+            {playing && (
+              <Badge variant="accent" className="ml-2 gap-1.5">
+                <span className="bg-accent-ink size-1.5 animate-pulse rounded-full" />
+                replay
+              </Badge>
+            )}
             <span className="text-ink-4 ml-auto font-mono text-[11px]">
-              {screenshots.length} frame{screenshots.length === 1 ? "" : "s"}
+              {displayedIdx + 1} / {screenshots.length}
             </span>
-            {pinned && (
+            {screenshots.length > 1 && !playing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startPlay}
+                aria-label="Play replay"
+              >
+                <PlayIcon className="size-[13px]" />
+                Play
+              </Button>
+            )}
+            {playing && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPlaySpeed((s) => (s >= 4 ? 1 : s * 2))}
+                  aria-label="Cycle replay speed"
+                >
+                  {playSpeed}×
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={stopPlay}
+                  aria-label="Pause replay"
+                >
+                  Pause
+                </Button>
+              </>
+            )}
+            {!playing && pinned && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1562,15 +1695,7 @@ function LiveScreenView({
                 <button
                   key={s.path}
                   type="button"
-                  onClick={() =>
-                    setPinned(
-                      pinned === s.path
-                        ? null
-                        : i === screenshots.length - 1
-                          ? null
-                          : s.path,
-                    )
-                  }
+                  onClick={() => scrubTo(i)}
                   className={cn(
                     "border-border relative h-12 w-20 shrink-0 overflow-hidden rounded border bg-black",
                     displayed?.path === s.path
@@ -1578,7 +1703,7 @@ function LiveScreenView({
                       : "hover:border-ink-4/60",
                   )}
                   title={s.path.split("/").pop()}
-                  aria-label={`Open ${s.path}`}
+                  aria-label={`Jump to frame ${i + 1}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

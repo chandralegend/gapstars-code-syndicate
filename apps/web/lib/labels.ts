@@ -8,11 +8,11 @@ import type { RunStatus, TestScenarioStatus } from "@/lib/api"
 
 const RUN_STATUS_LABEL: Record<RunStatus, string> = {
   pending: "Queued",
-  agent1_running: "Drafting the brief",
-  agent1_review: "Awaiting brief review",
-  agent2_running: "Exploring in the sandbox",
-  agent3_running: "Generating test cases",
-  agent3_review: "Awaiting test-case review",
+  agent1_running: "Brief Author drafting",
+  agent1_review: "Brief Author awaiting review",
+  agent2_running: "Sandbox Explorer exploring",
+  agent3_running: "Test Designer planning",
+  agent3_review: "Test Designer awaiting review",
   completed: "Completed",
   failed: "Failed",
 }
@@ -52,13 +52,14 @@ export function runStatusDot(status: RunStatus | string): DotKind {
 
 const NODE_LABEL: Record<string, string> = {
   load_project_context: "Loading context",
-  agent_1_generate: "Drafting the brief",
+  agent_1_generate: "Brief Author",
   human_review_1: "Brief review",
-  agent_2_placeholder: "Sandbox exploration",
-  agent_3_generate: "Generating test cases",
+  agent_2_placeholder: "Sandbox Explorer",
+  agent_3_generate: "Test Designer",
   human_review_3: "Test-case review",
   persist_results: "Saving results",
-  script_generation: "Generating test scripts",
+  script_generation: "Script Builder",
+  test_execution: "Test runner",
 }
 
 const NODE_PHASE: Record<string, string> = {
@@ -70,6 +71,7 @@ const NODE_PHASE: Record<string, string> = {
   human_review_3: "Test cases",
   persist_results: "Saving",
   script_generation: "Scripts",
+  test_execution: "Test runs",
 }
 
 /**
@@ -106,13 +108,13 @@ export function runPhaseTitle(status: RunStatus | string): string {
     case "pending":
       return "Run queued"
     case "agent1_running":
-      return "Drafting the brief"
+      return "Brief Author at work"
     case "agent1_review":
       return "Review the brief"
     case "agent2_running":
-      return "Exploring in the sandbox"
+      return "Sandbox Explorer at work"
     case "agent3_running":
-      return "Generating test cases"
+      return "Test Designer at work"
     case "agent3_review":
       return "Review the test cases"
     case "completed":
@@ -139,10 +141,10 @@ const EVENT_LABEL: Record<string, string> = {
   sandbox_timeout_warning: "Sandbox running low on time",
   sandbox_timeout_extended: "Sandbox got more time",
   workflow_completed: "Run completed",
-  script_bundle_started: "Generating test scripts",
-  script_bundle_progress: "Test-script progress",
+  script_bundle_started: "Script Builder started",
+  script_bundle_progress: "Script Builder progress",
   script_bundle_succeeded: "Test scripts ready",
-  script_bundle_failed: "Test-script generation failed",
+  script_bundle_failed: "Script Builder failed",
   test_execution_started: "Running tests",
   test_execution_progress: "Test execution progress",
   test_execution_test_outcome: "Test result",

@@ -67,10 +67,19 @@ async def _run_sandbox_task(state: QAWorkflowState, run_id: uuid.UUID) -> dict:
         try:
             task_id = await sandbox.create_task(
                 prompt=prompt,
-                model=settings.sandbox_default_model,
+                # Agent 2 uses Haiku for speed (recon-only, no code generation).
+                # Agent 4 keeps Sonnet via its own worker, since it actually
+                # writes Python and intelligence is non-negotiable there.
+                model=settings.sandbox_agent2_model,
                 system_prompt_suffix=WORKSPACE_CONTRACT,
                 timeout_seconds=settings.sandbox_default_timeout_seconds,
-                max_iterations=settings.sandbox_max_iterations,
+                max_iterations=settings.sandbox_agent2_max_iterations,
+                # Speed levers: shorter per-turn output, fewer historical
+                # screenshots in context, and the beta header that returns
+                # tighter tool messages.
+                max_tokens=settings.sandbox_agent2_max_tokens,
+                only_n_most_recent_images=settings.sandbox_agent2_recent_images,
+                token_efficient_tools_beta=True,
             )
         except SandboxError as exc:
             await _emit_event(
@@ -85,7 +94,7 @@ async def _run_sandbox_task(state: QAWorkflowState, run_id: uuid.UUID) -> dict:
             event_type="sandbox_task_created",
             payload={
                 "task_id": task_id,
-                "model": settings.sandbox_default_model,
+                "model": settings.sandbox_agent2_model,
                 "timeout_seconds": settings.sandbox_default_timeout_seconds,
             },
         )

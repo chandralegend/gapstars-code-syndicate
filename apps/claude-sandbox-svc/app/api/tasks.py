@@ -141,6 +141,7 @@ async def create_task(
         "tool_version": spec.tool_version,
         "only_n_most_recent_images": spec.only_n_most_recent_images,
         "thinking_budget": spec.thinking_budget,
+        "token_efficient_tools_beta": spec.token_efficient_tools_beta,
         "provider": spec.provider,
     }
     storage.write_input_json(task_id, runner_input)
