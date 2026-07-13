@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "html-slides": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "skillPath": "html-slides/SKILL.md",
+      "computedHash": "92ebe1f925720815523bafdbb17391bf33d073f6e9a99b32fe39bf7fe1750cf1"
+    }
+  }
+}
