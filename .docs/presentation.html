@@ -73,6 +73,43 @@
   #stars{position:fixed;inset:0;z-index:1;pointer-events:none}
   #confetti{position:fixed;inset:0;z-index:60;pointer-events:none}
 
+  /* ---------- laser pointer overlay ---------- */
+  #laser{
+    position:fixed;left:0;top:0;z-index:70;pointer-events:none;
+    width:44px;height:44px;
+    transform:translate3d(-9999px,-9999px,0);
+    display:none;will-change:transform;
+  }
+  body.laser-on #laser{display:block}
+  body.laser-on{cursor:none}
+  .laser-halo{
+    position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle,rgba(168,107,255,.85) 0%,rgba(132,44,255,.35) 40%,rgba(132,44,255,0) 70%);
+    filter:blur(2px);
+    animation:laserPulse 1.2s ease-in-out infinite;
+  }
+  .laser-dot{
+    position:absolute;left:50%;top:50%;
+    width:12px;height:12px;margin:-6px 0 0 -6px;
+    border-radius:50%;
+    background:radial-gradient(circle,#ffffff 0%,#a86bff 45%,#842cff 100%);
+    box-shadow:0 0 12px rgba(132,44,255,.9),0 0 24px rgba(168,107,255,.55);
+  }
+  @keyframes laserPulse{
+    0%,100%{transform:scale(1);opacity:.9}
+    50%{transform:scale(1.18);opacity:1}
+  }
+  #laser-badge{
+    position:fixed;top:18px;right:18px;z-index:71;pointer-events:none;
+    padding:6px 12px;border-radius:999px;
+    background:rgba(132,44,255,.14);
+    border:1px solid rgba(168,107,255,.35);
+    color:var(--text);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+    font-family:var(--sans);
+    opacity:0;transform:translateY(-4px);transition:opacity .3s ease,transform .3s ease;
+  }
+  body.laser-on #laser-badge{opacity:1;transform:translateY(0)}
+
   /* fine film grain for a premium, non-flat surface */
   body::before{
     content:"";position:fixed;inset:0;z-index:2;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
@@ -84,7 +121,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    #aurora::before,.blob,.arrow,.pulse-live .rec{animation:none!important}
+    #aurora::before,.blob,.arrow,.pulse-live .rec,.laser-halo{animation:none!important}
   }
 
   /* ---------- deck ---------- */
@@ -662,6 +699,36 @@
     </div>
   </section>
 
+  <!-- 12b — FRONTEND DEEP DIVE -->
+  <section class="slide">
+    <div class="stagger" style="width:100%">
+      <span class="eyebrow">Frontend deep-dive</span>
+      <h2 style="margin-bottom:.35em">How we built the frontend</h2>
+      <p class="lead" style="margin-bottom:.9em">Not vibe-coded. We picked tools that keep an LLM honest under a 4-hour clock.</p>
+      <div class="grid g3">
+        <div class="card">
+          <div class="tag">01</div>
+          <div class="k">✦</div>
+          <h3>Claude Code, driving Opus</h3>
+          <p>Opus over Sonnet or Haiku — it hallucinates less on unfamiliar APIs and refactors. Worth the extra latency when a bad component costs more debug time than it saves in generation speed.</p>
+        </div>
+        <div class="card">
+          <div class="tag">02</div>
+          <div class="k">▲</div>
+          <h3>Next.js — matches the API</h3>
+          <p>App Router + server components fit the streaming SSE contract from Phase 1 cleanly. File-based routes mapped 1:1 to the state machine's phases, so wiring was mechanical, not creative.</p>
+        </div>
+        <div class="card">
+          <div class="tag">03</div>
+          <div class="k">◇</div>
+          <h3>shadcn/ui — owned components</h3>
+          <p>Copy-paste primitives, not an npm dependency. We own the code, so Claude can edit variants safely without fighting a black-box library. Faster than scratch, tighter than raw Tailwind.</p>
+        </div>
+      </div>
+      <div class="softnote"><b>The pitch here isn't "AI wrote our UI in 20 minutes."</b> It's that we chose the <em class="ital">most careful</em> AI setup available, and stacked it on tools where correctness is the default.</div>
+    </div>
+  </section>
+
   <!-- 13 — CLOSE -->
   <section class="slide center">
     <div class="stagger">
@@ -676,6 +743,8 @@
 
 </div>
 
+<div id="laser"><div class="laser-halo"></div><div class="laser-dot"></div></div>
+<div id="laser-badge">Pointer · L to toggle</div>
 <div id="brandmark">QA<span class="dot">Loop</span></div>
 <div id="counter"><b id="cur">1</b> / <span id="total">13</span></div>
 <div class="nav-dots" id="dots"></div>
@@ -690,6 +759,12 @@
   document.getElementById('total').textContent = total;
   var hint = document.getElementById('hint');
   var dotsWrap = document.getElementById('dots');
+  var laserEl = document.getElementById('laser');
+  var laserOn = false;
+  function toggleLaser(){
+    laserOn = !laserOn;
+    document.body.classList.toggle('laser-on', laserOn);
+  }
 
   // dots
   slides.forEach(function(_,i){
@@ -726,9 +801,10 @@
     else if(e.key==='Home'){ go(0); }
     else if(e.key==='End'){ go(total-1); }
     else if(e.key==='c'||e.key==='C'){ burst(); }
+    else if(e.key==='l'||e.key==='L'){ e.preventDefault(); toggleLaser(); hideHint(); }
   });
-  // click / tap to advance (ignore clicks on nav dots)
-  document.getElementById('deck').addEventListener('click', function(e){ next(); hideHint(); });
+  // click / tap to advance (ignore clicks on nav dots, and freeze while laser is on)
+  document.getElementById('deck').addEventListener('click', function(e){ if(laserOn) return; next(); hideHint(); });
 
   var hintTimer = setTimeout(hideHint, 5000);
   function hideHint(){ hint.classList.add('hide'); clearTimeout(hintTimer); }
@@ -742,7 +818,10 @@
   var reduceStars = matchMedia('(prefers-reduced-motion: reduce)').matches;
   /* cursor the dots are drawn toward */
   var mx=-9999, my=-9999, mouseNear=false;
-  addEventListener('pointermove', function(e){ mx=e.clientX; my=e.clientY; mouseNear=true; }, {passive:true});
+  addEventListener('pointermove', function(e){
+    mx=e.clientX; my=e.clientY; mouseNear=true;
+    if(laserOn) laserEl.style.transform = 'translate3d('+(mx-22)+'px,'+(my-22)+'px,0)';
+  }, {passive:true});
   document.addEventListener('mouseleave', function(){ mouseNear=false; }, {passive:true});
   addEventListener('blur', function(){ mouseNear=false; });
   function sizeStars(){
